@@ -1,0 +1,41 @@
+[project]
+name = "vk-backup"
+version = "0.1.0"
+description = "Бесплатная программа с открытым кодом, которая сохраняет на компьютер всё своё из ВКонтакте: переписки, фото, видео, музыку, друзей и стену"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+# Только то, без чего не открыть страницу программы в браузере. К ВКонтакте программа ходит
+# стандартной библиотекой Python (urllib) — чужого сетевого кода в ней нет.
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.6.0",
+    # TestClient: Starlette 1.x работает на httpx2 (он только для Python 3.11+); на 3.10 — прежний httpx
+    "httpx2>=2.0.0; python_version >= '3.11'",
+    "httpx>=0.27.0; python_version < '3.11'",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "error::DeprecationWarning:vkbackup",
+    "error::DeprecationWarning:webapp",
+    "error::EncodingWarning",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "S102", "S307"]

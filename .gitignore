@@ -1,0 +1,45 @@
+# Локальные данные (НИКОГДА не коммитим): настройки, база, скачанное
+.env
+.env.*
+!.env.example
+settings.json
+settings.json.tmp
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# uv.exe, который webui.bat скачивает в папку программы
+.uv/
+
+# Журналы, скачанное и временные файлы
+logs/
+backup/
+*.log
+*.part
+*.tmp
+
+# Заметки и конфиги инструментов разработки — не для репозитория
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor*
+/scratch*
+
+# Python кеш
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Виртуальные окружения
+.venv/
+venv/
+
+# IDE и ОС
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

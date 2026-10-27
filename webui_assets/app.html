@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>Бэкап ВКонтакте</title>
+<link rel="stylesheet" href="/static/app.css?v=__APP_VERSION__">
+<script defer src="/static/app.js?v=__APP_VERSION__"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <a class="brand" href="#/home">
+      <span class="brand-logo">VK</span>
+      <span><b>Бэкап ВКонтакте</b><br><span class="tiny">версия __APP_VERSION__</span></span>
+    </a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="#/home" data-route="home">Главная</a>
+      <a href="#/security" data-route="security">Безопасность</a>
+      <a href="#/help" data-route="help">Помощь</a>
+    </nav>
+    <div class="side-lock" id="side-lock">
+      <span class="dot ok"></span>
+      <span>Сетевой замок<br><span class="tiny" id="side-lock-text">только файлы ВК</span></span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section id="screen-home" class="screen"></section>
+    <section id="screen-security" class="screen hidden"></section>
+    <section id="screen-help" class="screen hidden"></section>
+  </main>
+</div>
+</body>
+</html>

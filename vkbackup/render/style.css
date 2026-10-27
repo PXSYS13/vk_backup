@@ -1,0 +1,123 @@
+/* Стили архива «Бэкап ВКонтакте». Без шрифтов из интернета и без скриптов.
+   Тема — как в системе: светлая или тёмная. */
+:root{
+  color-scheme:light dark;
+  --bg:#eef1f5;--surface:#fff;--surface-2:#f4f6f9;--border:#dfe3ea;
+  --text:#15181e;--text-2:#4a5160;--text-3:#7a8191;
+  --accent:#2a6fdb;--link:#1f5fc4;
+  --in:#fff;--out:#e3f0ff;--fwd:#2a6fdb;
+  --font:"Segoe UI Variable Text","Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f1218;--surface:#181c24;--surface-2:#1f2430;--border:#2b3140;
+    --text:#e9ecf2;--text-2:#b4bac8;--text-3:#8790a3;
+    --accent:#6ea2ff;--link:#8db6ff;
+    --in:#1f2430;--out:#1d3352;--fwd:#6ea2ff;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3{line-height:1.25;margin:0 0 8px;letter-spacing:-.01em}
+h1{font-size:26px}h2{font-size:20px}h3{font-size:16px}
+.wrap{max-width:860px;margin:0 auto;padding:24px 16px 48px}
+.wrap.wide{max-width:1180px}
+.muted{color:var(--text-2)}
+.tiny{font-size:13px;color:var(--text-3)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin:0 0 14px}
+.crumbs{font-size:14px;margin:0 0 14px;color:var(--text-3)}
+.crumbs a{margin-right:6px}
+.foot{margin-top:32px;font-size:12px;color:var(--text-3);text-align:center}
+
+/* Главная архива */
+.profile{display:flex;gap:18px;align-items:center}
+.profile .ava{width:84px;height:84px;font-size:30px}
+.sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:14px}
+.section{display:block;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;color:var(--text)}
+.section:hover{border-color:var(--accent);text-decoration:none}
+.section b{display:block;font-size:17px;margin-bottom:2px}
+.section span{color:var(--text-2);font-size:14px}
+.section.off{opacity:.55}
+
+/* Аватары: фото или инициалы */
+.ava{width:40px;height:40px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  font-weight:600;font-size:15px;color:#fff;object-fit:cover;background:#8a93a6}
+.c0{background:#e2574c}.c1{background:#f0a030}.c2{background:#8e6ad8}.c3{background:#3a9b5c}
+.c4{background:#2f8fd8}.c5{background:#d7558a}.c6{background:#2aa6a6}.c7{background:#7d8597}
+
+/* Списки: переписки, друзья, музыка */
+.list{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.item{display:flex;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--border);color:var(--text)}
+.item:first-child{border-top:0}
+a.item:hover{background:var(--surface-2);text-decoration:none}
+.item .grow{flex:1;min-width:0}
+.item .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .sub{color:var(--text-3);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .side{color:var(--text-3);font-size:13px;text-align:right;white-space:nowrap}
+table.grid{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+table.grid th,table.grid td{padding:8px 12px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
+table.grid th{background:var(--surface-2);font-size:13px;color:var(--text-2);font-weight:600;border-top:0}
+
+/* Переписка */
+.chat-head{position:sticky;top:0;z-index:2;background:var(--bg);padding:10px 0 12px;display:flex;gap:12px;align-items:center}
+.pager{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px;font-size:14px}
+.pager a,.pager b{padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface)}
+.pager b{background:var(--accent);border-color:var(--accent);color:#fff}
+.history{display:flex;flex-direction:column;gap:2px}
+.day{align-self:center;margin:14px 0 8px;padding:3px 12px;border-radius:999px;background:var(--surface-2);color:var(--text-2);font-size:13px}
+.service{align-self:center;margin:6px 0;color:var(--text-3);font-size:13px;text-align:center}
+.msg{display:flex;gap:10px;align-items:flex-end;max-width:100%}
+.msg .ava{width:34px;height:34px;font-size:13px}
+.msg.joined .ava{visibility:hidden;height:0}
+.bubble{background:var(--in);border:1px solid var(--border);border-radius:14px;padding:7px 12px 6px;max-width:min(620px,100%);min-width:120px;overflow-wrap:anywhere}
+.msg.out .bubble{background:var(--out)}
+.msg.joined{margin-top:-1px}
+.who{font-weight:600;font-size:14px}
+.who a{color:inherit}
+.time{display:block;text-align:right;margin:2px 0 -2px;color:var(--text-3);font-size:12px;line-height:1.3}
+.edited{color:var(--text-3);font-size:12px}
+.reply,.fwd{border-left:3px solid var(--fwd);padding:2px 0 2px 10px;margin:4px 0}
+.reply{color:var(--text-2);font-size:14px}
+.fwd-head{color:var(--fwd);font-size:13px;font-weight:600}
+
+/* Вложения */
+.att{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px}
+.photos a{display:block}
+.photos img{width:100%;height:150px;object-fit:cover;border-radius:8px;display:block;background:var(--surface-2)}
+.photos.single{grid-template-columns:minmax(0,420px)}
+.photos.single img{height:auto;max-height:520px;object-fit:contain}
+.sticker img{width:128px;height:128px;object-fit:contain}
+video{max-width:100%;border-radius:8px;background:#000}
+audio{width:100%;max-width:420px}
+.file{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--surface-2)}
+.file .ico{width:32px;height:32px;border-radius:8px;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
+.missing{color:var(--text-3);font-size:13px;font-style:italic}
+
+/* Стена */
+.post .head{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.post .text{margin:6px 0}
+.post .stats{color:var(--text-3);font-size:13px;margin-top:8px}
+.repost{border-left:3px solid var(--fwd);padding-left:12px;margin:8px 0}
+.comments{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:8px}
+.comment{display:flex;gap:8px;font-size:14px}
+.comment .ava{width:28px;height:28px;font-size:11px}
+
+/* Фото */
+.albums{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.album{display:block;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;color:var(--text)}
+.album img,.album .noimg{width:100%;height:150px;object-fit:cover;display:block;background:var(--surface-2)}
+.album div{padding:8px 12px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
+.gallery figure{margin:0}
+.gallery img{width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;background:var(--surface-2)}
+.gallery figcaption{font-size:12px;color:var(--text-3);padding:2px 2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media (max-width:600px){
+  .wrap{padding:16px 12px 40px}
+  .photos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gallery{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
