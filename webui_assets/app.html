@@ -6,32 +6,50 @@
 <meta name="color-scheme" content="light dark">
 <meta name="referrer" content="no-referrer">
 <title>Бэкап ВКонтакте</title>
+<!-- Тема — до отрисовки, чтобы не мигало. Отдельным файлом: встроенные скрипты запрещены CSP -->
+<script src="/static/theme.js?v=__APP_VERSION__"></script>
 <link rel="stylesheet" href="/static/app.css?v=__APP_VERSION__">
 <script defer src="/static/app.js?v=__APP_VERSION__"></script>
 </head>
 <body>
 <div class="app">
   <aside class="side">
-    <a class="brand" href="#/home">
-      <span class="brand-logo">VK</span>
-      <span><b>Бэкап ВКонтакте</b><br><span class="tiny">версия __APP_VERSION__</span></span>
+    <a class="brand" href="#/home" aria-label="На главную">
+      <span class="brand-logo" data-icon="vk"></span>
+      <span class="brand-text">
+        <span class="brand-name">Бэкап ВКонтакте</span>
+        <span class="brand-sub">версия __APP_VERSION__</span>
+      </span>
     </a>
     <nav class="nav" aria-label="Разделы">
-      <a href="#/home" data-route="home">Главная</a>
-      <a href="#/security" data-route="security">Безопасность</a>
-      <a href="#/help" data-route="help">Помощь</a>
+      <a href="#/home" data-route="home"><span class="ico" data-icon="home"></span><span>Главная</span></a>
+      <a href="#/search" data-route="search"><span class="ico" data-icon="search"></span><span>Поиск</span></a>
+      <a href="#/stats" data-route="stats"><span class="ico" data-icon="chart"></span><span>ВК в цифрах</span></a>
+      <a href="#/setup" data-route="setup"><span class="ico" data-icon="sliders"></span><span>Настройка</span></a>
+      <a href="#/security" data-route="security"><span class="ico" data-icon="shield"></span><span>Безопасность</span></a>
+      <a href="#/help" data-route="help"><span class="ico" data-icon="help"></span><span>Помощь</span></a>
     </nav>
-    <div class="side-lock" id="side-lock">
-      <span class="dot ok"></span>
-      <span>Сетевой замок<br><span class="tiny" id="side-lock-text">только файлы ВК</span></span>
+    <div class="side-foot">
+      <a class="side-lock" id="side-lock" href="#/security">
+        <span class="dot ok"></span>
+        <span>Сетевой замок<br><span class="tiny" id="side-lock-text">только файлы ВК</span></span>
+      </a>
+      <button type="button" class="theme-toggle" data-act="theme" id="theme-toggle">
+        <span class="ico" data-icon="moon"></span><span id="theme-label">Тёмная тема</span>
+      </button>
     </div>
   </aside>
 
   <main class="main">
     <section id="screen-home" class="screen"></section>
+    <section id="screen-search" class="screen hidden"></section>
+    <section id="screen-stats" class="screen hidden"></section>
+    <section id="screen-setup" class="screen hidden"></section>
     <section id="screen-security" class="screen hidden"></section>
     <section id="screen-help" class="screen hidden"></section>
   </main>
 </div>
+<div id="tip" class="tip hidden" role="tooltip"></div>
+<noscript>Для работы программы нужен JavaScript.</noscript>
 </body>
 </html>

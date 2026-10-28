@@ -2,6 +2,7 @@
 
 import csv
 import re
+import time
 from pathlib import Path
 
 import fake_archive
@@ -178,3 +179,94 @@ def test_not_an_archive_is_explained(tmp_path):
     (tmp_path / "x.zip").write_bytes(b"nope")
     snap = run(tmp_path / "x.zip", tmp_path / "out", download=False)
     assert snap["state"] == "error" and snap["problem"] == "archive"
+
+
+@pytest.fixture
+def flaky_voice(monkeypatch, fake_net):
+    """Голосовое лежит на сервере ВК, который не отвечает (504) первые `fails` попыток."""
+    state = {"fails": 4, "calls": 0}
+    good = net.download
+
+    def download(url, dest):
+        if url == fake_archive.VOICE_URL:
+            state["calls"] += 1
+            if state["calls"] <= state["fails"]:
+                raise net.NetError("psv4.userapi.com ответил 504", 504, "psv4.userapi.com")
+        return good(url, dest)
+
+    monkeypatch.setattr(net, "download", download)
+    return state
+
+
+def _until(b, check, timeout=10.0):
+    end = time.time() + timeout
+    while time.time() < end and not check(b.snapshot()):
+        time.sleep(0.02)
+    return b.snapshot()
+
+
+def test_vk_outage_files_are_retried_until_they_come(archive_zip, tmp_path, flaky_voice, monkeypatch):
+    monkeypatch.setattr("vkbackup.backup.RETRY_EVERY", 0.05)
+    out = tmp_path / "out"
+    snap = run(archive_zip, out)
+    assert snap["state"] == "done", snap
+    # 3 попытки в первом проходе, потом по одной на круг: 4-я — неудача, 5-я — скачалось
+    assert flaky_voice["calls"] == 5
+    assert [(r["tried"], r["got"]) for r in snap["rounds"]] == [(1, 0), (1, 1)]
+    page = (out / "messages" / "Пётр Тестов (2002)" / "messages.html").read_text(encoding="utf-8")
+    assert "voice_messages/103_1.ogg" in page and "<audio" in page
+    store = Store(out / DB_NAME)
+    try:
+        assert store.waiting_media() == 0 and store.failed_media() == []
+    finally:
+        store.close()
+
+
+def test_waiting_for_vk_can_be_stopped_and_pages_are_ready(archive_zip, tmp_path, flaky_voice, monkeypatch):
+    monkeypatch.setattr("vkbackup.backup.RETRY_EVERY", 600)
+    flaky_voice["fails"] = 10**6
+    out = tmp_path / "out"
+    b = Backup()
+    assert b.start(archive_zip, out, ALL, True)
+    snap = _until(b, lambda s: s["step"] == "waiting")
+    assert snap["step"] == "waiting" and snap["next_retry"] > time.time()
+    assert "ждёт серверов ВК" in snap["text"]
+    assert (out / "index.html").exists()  # архив уже можно смотреть
+    store = Store(out / DB_NAME)
+    try:
+        assert store.waiting_media() == 1
+        assert store.media_stats()["messages"]["waiting"] == 1
+    finally:
+        store.close()
+    b.stop()
+    b.wait(10)
+    assert b.snapshot()["state"] == "stopped"
+
+
+def test_retry_now_skips_the_wait(archive_zip, tmp_path, flaky_voice, monkeypatch):
+    monkeypatch.setattr("vkbackup.backup.RETRY_EVERY", 600)
+    flaky_voice["fails"] = 3
+    b = Backup()
+    assert not b.retry_now()  # ещё ничего не ждём
+    assert b.start(archive_zip, tmp_path / "out", ALL, True)
+    _until(b, lambda s: s["step"] == "waiting")
+    assert b.retry_now()
+    b.wait(10)
+    assert b.snapshot()["state"] == "done"
+    assert flaky_voice["calls"] == 4
+
+
+def test_fresh_link_gets_fresh_tries(tmp_path):
+    store = Store(tmp_path / DB_NAME)
+    try:
+        store.add_media("a.jpg", "https://sun9-1.userapi.com/old", "photos")
+        for _ in range(3):
+            store.media_failed("a.jpg", "504", final=False)
+        assert store.waiting_media() == 1 and store.pending_media() == []
+        store.add_media("a.jpg", "https://sun9-1.userapi.com/old", "photos")  # тот же адрес — ничего
+        assert store.waiting_media() == 1
+        store.media_failed("a.jpg", "403", final=True)
+        store.add_media("a.jpg", "https://sun9-1.userapi.com/new", "photos")  # свежий архив
+        assert store.pending_media() == [("a.jpg", "https://sun9-1.userapi.com/new")]
+    finally:
+        store.close()

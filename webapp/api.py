@@ -15,12 +15,13 @@ import zipfile
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
-from vkbackup import APP_VERSION, firewall
+from vkbackup import APP_VERSION, firewall, media, stats
 from vkbackup.archive import Archive, NotAnArchive
 from vkbackup.backup import SECTION_TITLES, SECTIONS, Backup, render_archive
+from vkbackup.files import long_path
 from vkbackup.store import DB_NAME, Store
 from webapp import config, paths, ports
 
@@ -62,9 +63,10 @@ def _archive_stats(folder: Path) -> dict | None:
             "posts": store.count("post"),
             "tracks": store.count("track"),
             "docs": store.count("doc"),
-            "media": store.media_stats(),
+            "media": store.media_stats(media.MAX_TRIES),
             "failed": store.failed_media(20),
             "index": (folder / "index.html").exists(),
+            "stats_page": (folder / "stats" / "index.html").exists(),
             "name": (store.get("profile", "me") or {}).get("name") or "",
         }
     finally:
@@ -180,6 +182,13 @@ def stop() -> dict:
     return _resp(True, "Останавливаю")
 
 
+@router.post("/api/retry-now")
+def retry_now() -> dict:
+    if not backup.retry_now():
+        return _resp(False, "Сейчас нечего повторять")
+    return _resp(True, "Пробую сейчас")
+
+
 def _store() -> tuple[Store, Path]:
     folder = Path(config.load()["folder"])
     if not (folder / DB_NAME).exists():
@@ -197,6 +206,45 @@ def retry_failed() -> dict:
     finally:
         store.close()
     return _resp(True, f"Вернул в очередь: {n}. Нажмите «Сохранить» — программа попробует их снова.")
+
+
+# Статистика считается за секунды и меняется только с новыми сообщениями: держим последнюю
+_stats_cache: dict[tuple, dict] = {}
+
+
+@router.get("/api/stats")
+def get_stats() -> dict:
+    store, folder = _store()
+    try:
+        key = (str(folder), store.message_count(), store.count("friend"), store.count("photo"))
+        if key not in _stats_cache:
+            _stats_cache.clear()
+            _stats_cache[key] = stats.compute(store)
+        return {**_stats_cache[key], "on_this_day": stats.on_this_day(store)}
+    finally:
+        store.close()
+
+
+@router.get("/api/search")
+def search(q: str = "", peer: int | None = None) -> dict:
+    store, _folder = _store()
+    try:
+        return stats.search(store, q[:200], peer_id=peer)
+    finally:
+        store.close()
+
+
+@router.get("/archive/{rel_path:path}")
+def archive_file(rel_path: str = "index.html"):
+    """Страницы и файлы готового архива — чтобы смотреть его прямо отсюда и открывать
+    найденное сообщение. Только файлы внутри папки архива, только с этого компьютера."""
+    folder = Path(config.load()["folder"]).resolve()
+    target = (folder / (rel_path or "index.html")).resolve()
+    if target.is_dir():
+        target = target / "index.html"
+    if folder not in target.parents or target.name == DB_NAME or not os.path.isfile(long_path(str(target))):
+        raise HTTPException(404, "Такого файла в архиве нет")
+    return FileResponse(long_path(str(target)))
 
 
 @router.post("/api/render")

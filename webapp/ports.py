@@ -69,9 +69,10 @@ async def csrf_guard(request, call_next):
     host = (request.headers.get("host") or "").lower()
     if host and host not in _ALLOWED_HOSTS:
         return JSONResponse({"detail": "Forbidden host"}, status_code=403)
-    # Браузер ставит этот заголовок сам; same-site — это и копия программы на соседнем порте
+    # Браузер ставит этот заголовок сам; same-site — это и копия программы на соседнем порте.
+    # /archive/ — страницы и фото архива: чужой сайт не должен даже проверить, есть ли они
     site = request.headers.get("sec-fetch-site")
-    if site and site not in ("same-origin", "none") and request.url.path.startswith("/api/"):
+    if site and site not in ("same-origin", "none") and request.url.path.startswith(("/api/", "/archive/")):
         return JSONResponse({"detail": "Forbidden site"}, status_code=403)
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         origin = request.headers.get("origin") or ""

@@ -5,6 +5,9 @@
    потоков. Это единственный шаг, где программа ходит в интернет, и только на файловые
    серверы ВК (см. firewall.py). Шаг можно выключить: тогда сети нет вовсе.
 3. Страницы: HTML-архив из базы, тоже без сети.
+4. Ожидание ВК: файлы, которые серверы ВК не отдали из-за сбоя (таймаут, 5xx), программа
+   пробует снова каждые RETRY_EVERY секунд, пока открыта. Страницы уже собраны — архив
+   можно смотреть, а докачанное появляется в нём после каждого круга.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from vkbackup.archive import Archive, NotAnArchive
 from vkbackup.files import keep_awake
 from vkbackup.render import messages as render_messages
 from vkbackup.render import sections as render_sections
+from vkbackup.render import stats as render_stats
 from vkbackup.render.base import plural
 from vkbackup.store import DB_NAME, Store
 
@@ -27,13 +31,15 @@ log = logging.getLogger("vkbackup")
 
 SECTIONS = importer.SECTIONS
 SECTION_TITLES = render_sections.TITLES
+# Сбой ВК 18 октября 2026 длился часы: повторять чаще бессмысленно, реже — долго ждать
+RETRY_EVERY = 10 * 60
 
 
 @dataclass
 class Status:
     """Что сейчас происходит — для экрана программы."""
     state: str = "idle"          # idle / running / stopping / done / stopped / error
-    step: str = ""               # import / download / render
+    step: str = ""               # import / download / render / waiting
     text: str = ""               # строка для человека
     done: int = 0
     total: int | None = None
@@ -42,6 +48,8 @@ class Status:
     problem: str | None = None   # archive / disk / error
     problem_text: str = ""
     counts: dict[str, int] = field(default_factory=dict)
+    next_retry: float | None = None          # когда следующий круг повтора
+    rounds: list[dict] = field(default_factory=list)  # последние круги: время, пробовали, скачали
 
 
 class Backup:
@@ -51,6 +59,7 @@ class Backup:
         self.status = Status()
         self._thread: threading.Thread | None = None
         self._cancel = threading.Event()
+        self._retry_now = threading.Event()
         self._lock = threading.Lock()
         self.downloader: media.Downloader | None = None
 
@@ -62,6 +71,7 @@ class Backup:
             if self.running():
                 return False
             self._cancel = threading.Event()
+            self._retry_now = threading.Event()
             self.downloader = None
             self.status = Status(state="running", started_at=time.time(), text="Начинаю…")
             self._thread = threading.Thread(target=self._run, args=(archive_path, root, tuple(sections), download),
@@ -74,8 +84,16 @@ class Backup:
             self.status.state = "stopping"
             self.status.text = "Останавливаю: дописываю текущее…"
             self._cancel.set()
+            self._retry_now.set()
             if self.downloader:
                 self.downloader.abort()
+
+    def retry_now(self) -> bool:
+        """«Попробовать сейчас»: не ждать следующего круга повтора."""
+        if self.running() and self.status.step == "waiting":
+            self._retry_now.set()
+            return True
+        return False
 
     def wait(self, timeout: float | None = None) -> None:
         if self._thread is not None:
@@ -92,6 +110,48 @@ class Backup:
     def _report(self, step: str, done: int, total: int | None, text: str) -> None:
         self.status.done, self.status.total, self.status.text = done, total, text
 
+    def _download(self, store: Store, root: Path, label: str) -> int:
+        """Один проход по очереди файлов. Возвращает, сколько скачалось."""
+        self.status.step = "download"
+        self.downloader = media.Downloader(store, root)
+        self.downloader.start()
+        self.downloader.finish()
+        while self.downloader.alive():
+            if self._cancel.is_set():
+                raise importer.Cancelled()
+            stats = store.media_stats(media.MAX_TRIES)
+            left = sum(s["pending"] for s in stats.values())
+            total = sum(s["pending"] + s["waiting"] + s["done"] + s["failed"] for s in stats.values())
+            self._report("download", total - left, total, f"{label}: осталось {left}")
+            time.sleep(0.5)
+        if self.downloader.disk_error:
+            raise media.DiskProblem(self.downloader.disk_error)
+        return self.downloader.done_count
+
+    def _wait_for_vk(self, store: Store, root: Path) -> None:
+        """Файлы, которые ВК не отдал из-за сбоя, — снова и снова, пока не скачаются или не нажмут «Остановить»."""
+        st = self.status
+        while waiting := store.waiting_media(media.MAX_TRIES):
+            st.step = "waiting"
+            st.next_retry = time.time() + RETRY_EVERY
+            st.done, st.total = 0, None
+            st.text = (f"{plural(waiting, 'файл ждёт', 'файла ждут', 'файлов ждут')} серверов ВК — "
+                       f"следующая попытка в {time.strftime('%H:%M', time.localtime(st.next_retry))}")
+            self._retry_now.clear()
+            while not self._retry_now.is_set() and time.time() < st.next_retry:
+                self._retry_now.wait(1)
+            if self._cancel.is_set():
+                raise importer.Cancelled()
+            st.next_retry = None
+            tried = store.requeue_waiting(media.MAX_TRIES)
+            got = self._download(store, root, f"Повтор: пробую {plural(tried, 'файл', 'файла', 'файлов')}, ждавших ВК")
+            st.rounds = (st.rounds + [{"time": time.time(), "tried": tried, "got": got}])[-5:]
+            log.info("повтор: из %s файлов, ждавших ВК, скачано %s", tried, got)
+            if got:
+                st.step = "render"
+                self._report("render", 0, None, "Добавляю докачанное в страницы архива…")
+                render_archive(store, root)
+
     def _run(self, archive_path: Path, root: Path, sections: tuple[str, ...], download: bool) -> None:
         st = self.status
         store = None
@@ -100,30 +160,22 @@ class Backup:
                 raise RuntimeError("сетевой замок должен стоять до любого запроса в сеть")
             root.mkdir(parents=True, exist_ok=True)
             store = Store(root / DB_NAME)
-            with keep_awake(), Archive(archive_path) as archive:
-                st.step = "import"
-                ctx = importer.Ctx(archive=archive, store=store, sections=sections, download=download,
-                                   cancel=self._cancel, report=lambda *a: self._report("import", *a[1:]))
-                st.counts = importer.import_archive(ctx)
-            if download:
-                st.step = "download"
-                self.downloader = media.Downloader(store, root)
-                self.downloader.start()
-                self.downloader.finish()
-                while self.downloader.alive():
-                    if self._cancel.is_set():
-                        raise importer.Cancelled()
-                    stats = store.media_stats()
-                    left = sum(s.get("pending", 0) for s in stats.values())
-                    total = sum(s.get("pending", 0) + s.get("done", 0) + s.get("failed", 0) for s in stats.values())
-                    self._report("download", total - left, total, f"Скачиваю файлы по ссылкам из архива: осталось {left}")
-                    time.sleep(0.5)
-                if self.downloader.disk_error:
-                    raise media.DiskProblem(self.downloader.disk_error)
-            st.step = "render"
-            self._report("render", 0, None, "Собираю страницы архива…")
-            render_archive(store, root)
+            with keep_awake():
+                with Archive(archive_path) as archive:
+                    st.step = "import"
+                    ctx = importer.Ctx(archive=archive, store=store, sections=sections, download=download,
+                                       cancel=self._cancel, report=lambda *a: self._report("import", *a[1:]))
+                    st.counts = importer.import_archive(ctx)
+                if download:
+                    store.requeue_waiting(media.MAX_TRIES)  # новый запуск — новые попытки
+                    self._download(store, root, "Скачиваю файлы по ссылкам из архива")
+                st.step = "render"
+                self._report("render", 0, None, "Собираю страницы архива…")
+                render_archive(store, root)
+                if download:
+                    self._wait_for_vk(store, root)
             st.state = "done"
+            st.next_retry = None
             st.text = "Готово: архив собран"
         except importer.Cancelled:
             st.state = "stopped"
@@ -170,5 +222,6 @@ def render_archive(store: Store, root: Path) -> dict[str, str]:
         sections["music"] = render_sections.render_music(store, root)
     if store.count("doc"):
         sections["docs"] = render_sections.render_docs(store, root)
-    render_sections.render_index(store, root, sections)
+    stats = render_stats.render_stats(store, root) if store.message_count() else None
+    render_sections.render_index(store, root, sections, stats)
     return sections

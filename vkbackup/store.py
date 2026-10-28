@@ -71,6 +71,9 @@ class Store:
             conn = sqlite3.connect(self.path, timeout=30, check_same_thread=False)
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
+            # LOWER в SQLite понимает только латиницу: поиск по-русски — через Python
+            conn.create_function("ulower", 1, lambda s: s.lower() if isinstance(s, str) else s,
+                                 deterministic=True)
             self._tls.conn = conn
             with self._lock:
                 self._all.append(conn)
@@ -85,6 +88,10 @@ class Store:
         except BaseException:
             conn.rollback()
             raise
+
+    def query(self, sql: str, params: tuple = ()) -> list[tuple]:
+        """Запрос только на чтение — для статистики и поиска."""
+        return self._conn().execute(sql, params).fetchall()
 
     def close(self) -> None:
         with self._lock:
@@ -163,11 +170,14 @@ class Store:
 
     def add_media(self, path: str, url: str, section: str) -> bool:
         """Файл в очередь. Уже скачанный не трогаем; у ждущего обновляем адрес — ВК выдаёт
-        адреса файлов с подписью, и свежий адрес надёжнее старого."""
+        адреса файлов с подписью, и свежий адрес надёжнее старого. С новым адресом файл
+        пробуется заново, даже если старый адрес устарел или не отвечал."""
         with self.tx() as c:
             cur = c.execute(
                 "INSERT INTO media(path, url, section) VALUES (?, ?, ?) "
-                "ON CONFLICT(path) DO UPDATE SET url=excluded.url "
+                "ON CONFLICT(path) DO UPDATE SET url=excluded.url, "
+                "tries=CASE WHEN media.url != excluded.url THEN 0 ELSE media.tries END, "
+                "status=CASE WHEN media.url != excluded.url THEN 'pending' ELSE media.status END "
                 "WHERE media.status != 'done'",
                 (path, url, section))
             return cur.rowcount > 0
@@ -191,15 +201,27 @@ class Store:
         row = self._conn().execute("SELECT status FROM media WHERE path=?", (path,)).fetchone()
         return row[0] if row else None
 
-    def media_stats(self) -> dict[str, dict[str, int]]:
-        """{раздел: {pending, done, failed, bytes}}."""
+    def media_stats(self, max_tries: int = 3) -> dict[str, dict[str, int]]:
+        """{раздел: {pending, waiting, done, failed, bytes}}. waiting — файлы, которые ВК
+        не отдал max_tries раз подряд (сбой серверов): их пробует следующий круг повтора."""
         out: dict[str, dict[str, int]] = {}
         for section, status, n, size in self._conn().execute(
-                "SELECT section, status, COUNT(*), COALESCE(SUM(size), 0) FROM media GROUP BY section, status"):
-            s = out.setdefault(section, {"pending": 0, "done": 0, "failed": 0, "bytes": 0})
+                "SELECT section, CASE WHEN status='pending' AND tries >= ? THEN 'waiting' ELSE status END AS st, "
+                "COUNT(*), COALESCE(SUM(size), 0) FROM media GROUP BY section, st", (max_tries,)):
+            s = out.setdefault(section, {"pending": 0, "waiting": 0, "done": 0, "failed": 0, "bytes": 0})
             s[status] = n
             s["bytes"] += size
         return out
+
+    def waiting_media(self, max_tries: int = 3) -> int:
+        return self._conn().execute("SELECT COUNT(*) FROM media WHERE status='pending' AND tries >= ?",
+                                    (max_tries,)).fetchone()[0]
+
+    def requeue_waiting(self, max_tries: int = 3) -> int:
+        """Ждавшие ВК файлы — снова в очередь, по одной попытке на круг."""
+        with self.tx() as c:
+            return c.execute("UPDATE media SET tries=? WHERE status='pending' AND tries >= ?",
+                             (max_tries - 1, max_tries)).rowcount
 
     def failed_media(self, limit: int = 50) -> list[dict]:
         rows = self._conn().execute(

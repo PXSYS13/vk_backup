@@ -42,7 +42,7 @@ def me_name(store: Store) -> str:
 
 # ── Главная ──
 
-def render_index(store: Store, root: Path, sections: dict[str, str]) -> None:
+def render_index(store: Store, root: Path, sections: dict[str, str], stats: str | None = None) -> None:
     me = store.get("profile", "me") or {}
     name = me.get("name") or "Мой ВКонтакте"
     uid = int(me.get("id") or 0)
@@ -57,11 +57,13 @@ def render_index(store: Store, root: Path, sections: dict[str, str]) -> None:
         else:
             cards.append(f'<a class="section" href="{key}/index.html"><b>{title}</b><span>{h(text)}</span></a>')
     link = f"https://vk.com/id{uid}" if uid else ""
+    highlight = (f'<a class="section highlight" href="stats/index.html"><b>Мой ВКонтакте в цифрах</b>'
+                 f'<span>{h(stats)}: годы, главные собеседники, часы, первое сообщение</span></a>' if stats else "")
     body = (f'<div class="card profile">{avatar(name, uid, ava, 0)}<div>'
             f'<h1>{h(name)}</h1><div class="muted">{ext_link(link, link) if link else ""}</div>'
             f'<div class="tiny">{" · ".join(facts)}</div></div></div>'
-            f'<div class="sections">{"".join(cards)}</div>'
-            f'<div class="card tiny" style="margin-top:14px">Архив целиком лежит в этой папке. '
+            f'{highlight}<div class="sections">{"".join(cards)}</div>'
+            f'<div class="card tiny note">Архив целиком лежит в этой папке. '
             f'Все данные в машиночитаемом виде — в файле <code>vk_backup.db</code> (SQLite). '
             f'Страницы открываются без интернета: браузеру запрещено загружать для них что-либо из сети.</div>')
     write(root / "index.html", page(f"Архив ВКонтакте — {name}", body, 0))
