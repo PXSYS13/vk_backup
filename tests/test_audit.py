@@ -100,7 +100,9 @@ def test_only_two_runtime_dependencies():
 def test_program_page_loads_nothing_from_internet():
     html = (ROOT / "webui_assets" / "app.html").read_text(encoding="utf-8")
     assert not re.search(r'(?:src|href)="https?://', html)
-    js = (ROOT / "webui_assets" / "static" / "app.js").read_text(encoding="utf-8")
+    js = "\n".join(f.read_text(encoding="utf-8")
+                   for f in sorted((ROOT / "webui_assets" / "static" / "js").rglob("*.js")))
+    assert js, "скрипты страницы не нашлись"
     assert all(not a.startswith(("'http", '"http', "`http")) for a in re.findall(r"fetch\(\s*([^,)]+)", js))
     # Единственный внешний адрес — ссылка на страницу ВК «Защита данных», которую человек открывает сам
     urls = set(re.findall(r"https?://[^\s'\"`)<]+", js))

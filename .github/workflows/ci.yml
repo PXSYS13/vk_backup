@@ -32,6 +32,10 @@ jobs:
       - name: Lint
         run: uv run --locked --python ${{ matrix.python-version }} ruff check .
 
+      - name: Browser for page tests
+        # Playwright проверяет страницу программы в настоящем Chromium (tests/test_ui_browser.py)
+        run: uv run --locked --python ${{ matrix.python-version }} playwright install --with-deps chromium
+
       - name: Tests
         run: uv run --locked --python ${{ matrix.python-version }} pytest -q
         env:

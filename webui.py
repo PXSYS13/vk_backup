@@ -43,6 +43,7 @@ app.include_router(api.router)
 # Windows берёт MIME из реестра, и там .js бывает text/plain — браузер такой скрипт не выполнит
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("image/svg+xml", ".svg")
 app.mount("/static", StaticFiles(directory=str(paths.TEMPLATES_DIR / "static")), name="static")
 
 
@@ -50,9 +51,10 @@ app.mount("/static", StaticFiles(directory=str(paths.TEMPLATES_DIR / "static")),
 async def _no_outside_resources(request, call_next):
     """Страница программы тоже ничего не грузит из интернета: это видно и в браузере."""
     response = await call_next(request)
-    response.headers["Content-Security-Policy"] = (
+    # setdefault: файл из архива, который отдаётся только на скачивание, несёт свою, более строгую политику
+    response.headers.setdefault("Content-Security-Policy", (
         "default-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
-        "base-uri 'none'; form-action 'none'")
+        "base-uri 'none'; form-action 'none'"))
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cache-Control"] = "no-store"

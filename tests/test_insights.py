@@ -111,9 +111,11 @@ def test_stats_page_has_no_scripts_and_no_inline_styles(built):
 def test_program_page_has_no_inline_styles():
     """Политика безопасности страницы программы запрещает атрибут style — размеры полос ставит JS."""
     root = Path(__file__).resolve().parent.parent
-    for name in ("app.html", "static/app.js"):
-        text = (root / "webui_assets" / name).read_text(encoding="utf-8")
-        assert not re.search(r"""\sstyle=["'`]""", text), name
+    assets = root / "webui_assets"
+    files = [assets / "app.html", *sorted((assets / "static" / "js").rglob("*.js"))]
+    assert len(files) > 1, "скрипты страницы не нашлись"
+    for path in files:
+        assert not re.search(r"""\sstyle=["'`]""", path.read_text(encoding="utf-8")), path.name
 
 
 @pytest.fixture
@@ -148,12 +150,80 @@ def test_archive_is_viewable_through_the_program(client, archive_zip, tmp_path):
     assert client.get("/archive/stats").status_code == 200
     assert client.get("/archive/assets/style.css").headers["content-type"].startswith("text/css")
     assert client.get(f"/archive/{DB_NAME}").status_code == 404  # базу — нет
+    for tail in ("-wal", "-shm", "-journal"):  # и её служебные файлы тоже: в них те же сообщения
+        side = tmp_path / "out" / f"{DB_NAME}{tail}"
+        if not side.exists():
+            side.write_bytes(b"x")
+        assert client.get(f"/archive/{DB_NAME}{tail}").status_code == 404, tail
     assert client.get("/archive/%2e%2e/settings.json").status_code == 404
     assert client.get("/archive/..%5c..%5cwebui.py").status_code == 404
     assert client.get("/archive/nope.html").status_code == 404
     # Чужой сайт не может даже проверить, есть ли архив
     r = client.get("/archive/index.html", headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
+
+
+def test_attachments_from_people_are_downloaded_not_opened(client, archive_zip, tmp_path):
+    """Документ, который прислал собеседник, не должен работать как страница программы:
+    открытый с её адреса .html или .svg мог бы читать /api/… от её имени."""
+    _ready(client, archive_zip, tmp_path)
+    files = tmp_path / "out" / "messages" / "Пётр Тестов (2002)" / "files"
+    files.mkdir(parents=True, exist_ok=True)
+    for name, body in [("100_1_evil.html", "<script src='100_2_x.js'></script>"),
+                       ("100_2_x.js", "fetch('/api/search?q=пароль')"),
+                       ("100_3_pic.svg", "<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"),
+                       ("100_4_page.htm", "<b>hi</b>"), ("100_5_report.docx", "x"), ("100_6_noext", "x")]:
+        (files / name).write_text(body, encoding="utf-8")
+        r = client.get(f"/archive/messages/Пётр Тестов (2002)/files/{name}")
+        assert r.status_code == 200, name
+        assert r.headers["content-disposition"].startswith("attachment"), name
+        assert "sandbox" in r.headers["content-security-policy"], name
+    # Картинки, голосовые, PDF и текст по-прежнему открываются прямо в браузере
+    for name in ("100_7_photo.jpg", "100_8_voice.ogg", "100_9_scan.pdf", "100_10_note.txt"):
+        (files / name).write_bytes(b"x")
+        r = client.get(f"/archive/messages/Пётр Тестов (2002)/files/{name}")
+        assert "content-disposition" not in r.headers, name
+
+
+def test_every_page_the_program_builds_opens_as_a_page(client, archive_zip, tmp_path):
+    _ready(client, archive_zip, tmp_path)
+    out = tmp_path / "out"
+    pages = sorted(p.relative_to(out).as_posix() for p in out.rglob("*.html"))
+    assert len(pages) >= 8
+    for rel in pages:
+        r = client.get("/archive/" + rel)
+        assert r.status_code == 200 and "content-disposition" not in r.headers, rel
+        assert r.headers["content-type"].startswith("text/html"), rel
+        assert "sandbox" not in r.headers["content-security-policy"], rel
+
+
+def test_downloader_never_writes_over_a_program_page(tmp_path, monkeypatch):
+    """Старая очередь (архив версии 0.2.0) могла сохранить путь docs/index.html: скачанный
+    по нему чужой файл открылся бы как страница программы. Загрузчик такой путь не пишет."""
+    from vkbackup import media, net
+    calls = []
+    monkeypatch.setattr(net, "download", lambda url, dest: calls.append(url) or 0)
+    store = Store(tmp_path / DB_NAME)
+    try:
+        for path in ("docs/index.html", "docs/INDEX.HTML", "messages/Анна (5)/messages2.html"):
+            store.add_media(path, "https://psv4.userapi.com/x.html", "docs")
+        dl = media.Downloader(store, tmp_path)
+        dl.start()
+        dl.finish()
+        dl.join(10)
+        assert calls == []
+        assert {f["path"] for f in store.failed_media()} == {
+            "docs/index.html", "docs/INDEX.HTML", "messages/Анна (5)/messages2.html"}
+    finally:
+        store.close()
+    assert not (tmp_path / "docs" / "index.html").exists()
+
+
+def test_document_named_like_a_program_page_gets_another_name():
+    from vkbackup import importer
+    assert importer.doc_file("index.html") != "docs/index.html"
+    assert importer.doc_file("INDEX.HTML").lower() != "docs/index.html"
+    assert importer.doc_file("отчёт.pdf") == "docs/отчёт.pdf"
 
 
 def test_retry_now_when_idle(client):

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -80,7 +81,8 @@ class Backup:
             return True
 
     def stop(self) -> None:
-        if self.running():
+        # Только идущий бэкап: закончившийся ещё дописывает историю, и «Останавливаю» на нём бы застряло
+        if self.running() and self.status.state == "running":
             self.status.state = "stopping"
             self.status.text = "Останавливаю: дописываю текущее…"
             self._cancel.set()
@@ -128,7 +130,7 @@ class Backup:
             raise media.DiskProblem(self.downloader.disk_error)
         return self.downloader.done_count
 
-    def _wait_for_vk(self, store: Store, root: Path) -> None:
+    def _wait_for_vk(self, store: Store, root: Path, remember: Callable[[], None]) -> None:
         """Файлы, которые ВК не отдал из-за сбоя, — снова и снова, пока не скачаются или не нажмут «Остановить»."""
         st = self.status
         while waiting := store.waiting_media(media.MAX_TRIES):
@@ -147,6 +149,7 @@ class Backup:
             got = self._download(store, root, f"Повтор: пробую {plural(tried, 'файл', 'файла', 'файлов')}, ждавших ВК")
             st.rounds = (st.rounds + [{"time": time.time(), "tried": tried, "got": got}])[-5:]
             log.info("повтор: из %s файлов, ждавших ВК, скачано %s", tried, got)
+            remember()  # закроют программу посреди ожидания — в истории останется скачанное
             if got:
                 st.step = "render"
                 self._report("render", 0, None, "Добавляю докачанное в страницы архива…")
@@ -155,11 +158,18 @@ class Backup:
     def _run(self, archive_path: Path, root: Path, sections: tuple[str, ...], download: bool) -> None:
         st = self.status
         store = None
+        before = (0, 0)
         try:
             if download and not firewall.installed():
                 raise RuntimeError("сетевой замок должен стоять до любого запроса в сеть")
             root.mkdir(parents=True, exist_ok=True)
             store = Store(root / DB_NAME)
+            before = _downloaded(store)
+
+            def remember() -> None:
+                _record_run(store, st, sections, download, before)
+
+            remember()  # в истории сразу: «идёт» — и останется, если программу закроют на ходу
             with keep_awake():
                 with Archive(archive_path) as archive:
                     st.step = "import"
@@ -173,7 +183,7 @@ class Backup:
                 self._report("render", 0, None, "Собираю страницы архива…")
                 render_archive(store, root)
                 if download:
-                    self._wait_for_vk(store, root)
+                    self._wait_for_vk(store, root, remember)
             st.state = "done"
             st.next_retry = None
             st.text = "Готово: архив собран"
@@ -199,7 +209,34 @@ class Backup:
                         render_archive(store, root)  # что успели — уже можно посмотреть
                 except Exception:  # noqa: BLE001
                     log.exception("страницы архива не собрались")
+                try:
+                    _record_run(store, st, sections, download, before)
+                except Exception:  # noqa: BLE001 — история запусков не важнее самого архива
+                    log.exception("запуск не записался в историю")
                 store.close()
+
+
+def _downloaded(store: Store) -> tuple[int, int]:
+    """Сколько файлов и байт уже скачано — чтобы посчитать, сколько добавил этот запуск."""
+    stats = store.media_stats(media.MAX_TRIES).values()
+    return sum(s["done"] for s in stats), sum(s["bytes"] for s in stats)
+
+
+def _record_run(store: Store, st: Status, sections: tuple[str, ...], download: bool,
+                before: tuple[int, int]) -> None:
+    """Запуск — в историю для «Панели»: когда, сколько длился, чем кончился, что добавил."""
+    files, size = _downloaded(store)
+    store.save_run({
+        "started_at": st.started_at,
+        "finished_at": st.finished_at,
+        "state": st.state,
+        "problem_text": st.problem_text[:300],
+        "sections": list(sections),
+        "download": download,
+        "files": max(0, files - before[0]),
+        "bytes": max(0, size - before[1]),
+        "messages": store.message_count(),
+    })
 
 
 def render_archive(store: Store, root: Path) -> dict[str, str]:

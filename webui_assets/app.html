@@ -8,8 +8,17 @@
 <title>Бэкап ВКонтакте</title>
 <!-- Тема — до отрисовки, чтобы не мигало. Отдельным файлом: встроенные скрипты запрещены CSP -->
 <script src="/static/theme.js?v=__APP_VERSION__"></script>
+<link rel="icon" href="/static/favicon.svg?v=__APP_VERSION__" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css?v=__APP_VERSION__">
-<script defer src="/static/app.js?v=__APP_VERSION__"></script>
+<!-- Скрипты по экранам, без сборки: ядро первым, запуск последним -->
+<script defer src="/static/js/core.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/home.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/dashboard.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/setup.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/search.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/stats.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/info.js?v=__APP_VERSION__"></script>
+<script defer src="/static/js/main.js?v=__APP_VERSION__"></script>
 </head>
 <body>
 <div class="app">
@@ -23,6 +32,7 @@
     </a>
     <nav class="nav" aria-label="Разделы">
       <a href="#/home" data-route="home"><span class="ico" data-icon="home"></span><span>Главная</span></a>
+      <a href="#/dashboard" data-route="dashboard"><span class="ico" data-icon="grid"></span><span>Панель</span></a>
       <a href="#/search" data-route="search"><span class="ico" data-icon="search"></span><span>Поиск</span></a>
       <a href="#/stats" data-route="stats"><span class="ico" data-icon="chart"></span><span>ВК в цифрах</span></a>
       <a href="#/setup" data-route="setup"><span class="ico" data-icon="sliders"></span><span>Настройка</span></a>
@@ -41,7 +51,11 @@
   </aside>
 
   <main class="main">
+    <div id="offline" class="offline hidden" role="alert"><span class="ico" data-icon="alert"></span>
+      <div><b>Программа не отвечает.</b> Окно программы закрыто или компьютер засыпал. Запустите программу снова —
+        архив и скачанное никуда не делись, бэкап продолжится с того же места.</div></div>
     <section id="screen-home" class="screen"></section>
+    <section id="screen-dashboard" class="screen hidden"></section>
     <section id="screen-search" class="screen hidden"></section>
     <section id="screen-stats" class="screen hidden"></section>
     <section id="screen-setup" class="screen hidden"></section>

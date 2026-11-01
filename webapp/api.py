@@ -21,9 +21,9 @@ from pydantic import BaseModel
 from vkbackup import APP_VERSION, firewall, media, stats
 from vkbackup.archive import Archive, NotAnArchive
 from vkbackup.backup import SECTION_TITLES, SECTIONS, Backup, render_archive
-from vkbackup.files import long_path
+from vkbackup.files import is_program_page, long_path
 from vkbackup.store import DB_NAME, Store
-from webapp import config, paths, ports
+from webapp import config, dashboard, paths, ports
 
 log = logging.getLogger("webui")
 router = APIRouter()
@@ -31,6 +31,21 @@ backup = Backup()
 
 # Папки самой программы: архив поверх них лечь не может
 PROGRAM_SUBDIRS = ("vkbackup", "webapp", "webui_assets", "tests", "logs", ".git", ".venv", ".uv")
+# Поиск отдаёт по столько сообщений за раз: «Показать ещё» просит следующую порцию
+SEARCH_LIMIT = 500
+
+# В папке архива лежат и страницы программы, и файлы, которые прислали люди. Чужой .html или .svg,
+# открытый с адреса программы, работал бы от её имени: прочитал бы /api/search и увёл переписку.
+# Поэтому как страница открывается только то, что собрала сама программа (files.is_program_page), а
+# прямо в браузере показываются только типы, которые не исполняют скрипты. Всё остальное — скачать.
+INLINE_TYPES = frozenset({
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif",
+    ".ogg", ".oga", ".opus", ".mp3", ".m4a", ".aac", ".wav", ".flac",
+    ".mp4", ".webm", ".mov", ".m4v",
+    ".pdf", ".txt", ".csv", ".css",
+})
+# Если браузер всё же покажет такой файл, а не скачает: без скриптов, без адреса программы
+DOWNLOAD_CSP = "sandbox; default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 
 def _resp(ok: bool, msg: str, **extra) -> dict:
@@ -54,20 +69,15 @@ def _archive_stats(folder: Path) -> dict | None:
         return None
     store = Store(db)
     try:
+        runs = store.runs()
         return {
-            "messages": store.message_count(),
-            "chats": store.count("conversation"),
-            "friends": store.count("friend"),
-            "photos": store.count("photo"),
-            "videos": store.count("video"),
-            "posts": store.count("post"),
-            "tracks": store.count("track"),
-            "docs": store.count("doc"),
+            **dashboard.counts(store),
             "media": store.media_stats(media.MAX_TRIES),
             "failed": store.failed_media(20),
             "index": (folder / "index.html").exists(),
             "stats_page": (folder / "stats" / "index.html").exists(),
             "name": (store.get("profile", "me") or {}).get("name") or "",
+            "last_run": runs[0] if runs else None,
         }
     finally:
         store.close()
@@ -99,7 +109,8 @@ def find_archives() -> dict:
         try:
             with zipfile.ZipFile(zip_path) as z:
                 if any(n.endswith("messages/index-messages.html") for n in z.namelist()):
-                    found.append({"path": str(zip_path), "size": zip_path.stat().st_size})
+                    st = zip_path.stat()
+                    found.append({"path": str(zip_path), "size": st.st_size, "modified": st.st_mtime})
         except (OSError, zipfile.BadZipFile):
             continue
     return {"folder": str(folder), "archives": found}
@@ -226,12 +237,30 @@ def get_stats() -> dict:
 
 
 @router.get("/api/search")
-def search(q: str = "", peer: int | None = None) -> dict:
+def search(q: str = "", peer: int | None = None, limit: int = 100) -> dict:
     store, _folder = _store()
     try:
-        return stats.search(store, q[:200], peer_id=peer)
+        return stats.search(store, q[:200], limit=max(1, min(limit, SEARCH_LIMIT)), peer_id=peer)
     finally:
         store.close()
+
+
+@router.get("/api/chats")
+def chats() -> dict:
+    """Беседы для фильтра поиска."""
+    store, _folder = _store()
+    try:
+        return {"chats": stats.chats(store)}
+    finally:
+        store.close()
+
+
+@router.get("/api/dashboard")
+def get_dashboard() -> dict:
+    """Всё для экрана «Панель»: файлы по разделам, причины ошибок, диск, история запусков."""
+    settings = config.load()
+    archive = _clean(settings["archive"]) if settings["archive"].strip() else None
+    return dashboard.build(archive, Path(settings["folder"]), settings["download"])
 
 
 @router.get("/archive/{rel_path:path}")
@@ -242,9 +271,15 @@ def archive_file(rel_path: str = "index.html"):
     target = (folder / (rel_path or "index.html")).resolve()
     if target.is_dir():
         target = target / "index.html"
-    if folder not in target.parents or target.name == DB_NAME or not os.path.isfile(long_path(str(target))):
+    # База и её служебные файлы (-wal, -shm) — не страницы архива: в них все сообщения целиком
+    if folder not in target.parents or target.name.startswith(DB_NAME) or not os.path.isfile(long_path(str(target))):
         raise HTTPException(404, "Такого файла в архиве нет")
-    return FileResponse(long_path(str(target)))
+    rel = target.relative_to(folder).as_posix()
+    if is_program_page(rel) or target.suffix.lower() in INLINE_TYPES:
+        return FileResponse(long_path(str(target)))
+    # Тип оставляем настоящим: <img src="….svg"> на страницах архива по-прежнему показывает картинку
+    return FileResponse(long_path(str(target)), filename=target.name,
+                        headers={"Content-Security-Policy": DOWNLOAD_CSP})
 
 
 @router.post("/api/render")

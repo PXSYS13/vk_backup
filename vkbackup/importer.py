@@ -219,6 +219,13 @@ def import_music(ctx: Ctx) -> int:
     return len(tracks)
 
 
+def doc_file(title: str) -> str:
+    """Куда скачать документ. Имя «index.html» занято страницей раздела, которую собирает
+    программа: документ с таким именем лёг бы на её место и открылся бы как её страница."""
+    name = safe_name(title, 80)
+    return f"docs/{'_' + name if name.lower() == 'index.html' else name}"
+
+
 def import_docs(ctx: Ctx) -> int:
     a = ctx.archive
     if not a.exists("profile/documents.html"):
@@ -226,7 +233,7 @@ def import_docs(ctx: Ctx) -> int:
     docs = parse.documents_page(a.read("profile/documents.html"))
     for i, d in enumerate(docs):
         if d.get("url"):
-            d["file"] = ctx.media(f"docs/{safe_name(d['title'], 80)}", d["url"], "docs")
+            d["file"] = ctx.media(doc_file(d["title"]), d["url"], "docs")
     ctx.store.put_many("doc", ((d["link"] or str(i), d) for i, d in enumerate(docs)))
     return len(docs)
 

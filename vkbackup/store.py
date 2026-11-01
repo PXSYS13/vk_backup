@@ -21,6 +21,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 DB_NAME = "vk_backup.db"
+# История запусков бэкапа — в таблице progress под этим ключом (разделы так не называются)
+RUNS_KEY = "_runs"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS objects (
@@ -159,12 +161,32 @@ class Store:
 
     def get_progress(self, section: str, default: object = None) -> object:
         row = self._conn().execute("SELECT value FROM progress WHERE section=?", (section,)).fetchone()
-        return json.loads(row[0]) if row else default
+        if not row:
+            return default
+        try:
+            return json.loads(row[0])
+        except ValueError:  # испорченная запись не должна ронять экран программы
+            return default
 
     def set_progress(self, section: str, value: object) -> None:
         with self.tx() as c:
             c.execute("INSERT OR REPLACE INTO progress(section, value) VALUES (?, ?)",
                       (section, json.dumps(value, ensure_ascii=False)))
+
+    # ── История запусков ──
+
+    def save_run(self, run: dict, keep: int = 10) -> None:
+        """Запуск — в историю. Тот же запуск (то же started_at) обновляется, новый добавляется."""
+        runs = self.get_progress(RUNS_KEY, [])
+        runs = [r for r in runs if isinstance(r, dict)] if isinstance(runs, list) else []
+        if runs and runs[-1].get("started_at") == run.get("started_at"):
+            runs = runs[:-1]
+        self.set_progress(RUNS_KEY, [*runs, run][-keep:])
+
+    def runs(self) -> list[dict]:
+        """Последние запуски бэкапа — новые первыми."""
+        runs = self.get_progress(RUNS_KEY, [])
+        return [r for r in reversed(runs) if isinstance(r, dict)] if isinstance(runs, list) else []
 
     # ── Файлы ──
 
@@ -228,6 +250,11 @@ class Store:
             "SELECT path, section, error FROM media WHERE status='failed' ORDER BY rowid LIMIT ?",
             (limit,)).fetchall()
         return [{"path": p, "section": s, "error": e} for p, s, e in rows]
+
+    def failed_errors(self) -> list[tuple[str | None, int]]:
+        """Не скачавшиеся файлы по тексту ошибки: (ошибка, сколько файлов)."""
+        return self._conn().execute(
+            "SELECT error, COUNT(*) FROM media WHERE status='failed' GROUP BY error").fetchall()
 
     def retry_failed_media(self) -> int:
         with self.tx() as c:

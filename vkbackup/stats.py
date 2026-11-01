@@ -171,6 +171,15 @@ def on_this_day(store: Store, now: float | None = None, limit: int = 6) -> dict:
     return {"day": f"{t.tm_mday:02d}.{t.tm_mon:02d}", "messages": messages, "photos": photos}
 
 
+def chats(store: Store, limit: int = 3000) -> list[dict]:
+    """Беседы для фильтра поиска: самые длинные первыми."""
+    titles = _titles(store)
+    rows = store.query("SELECT peer_id, COUNT(*) AS n FROM messages GROUP BY peer_id "
+                       "ORDER BY n DESC, peer_id LIMIT ?", (limit,))
+    return [{"peer_id": p, "title": titles.get(int(p), {}).get("title") or str(p), "count": n}
+            for p, n in rows]
+
+
 def _like(text: str) -> str:
     return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 

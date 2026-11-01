@@ -33,7 +33,7 @@ def test_status_and_security_headers(client):
 def test_page_and_static(client):
     r = client.get("/")
     assert r.status_code == 200 and "Бэкап ВКонтакте" in r.text
-    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/js/core.js").status_code == 200
     assert client.get("/docs").status_code == 404
 
 

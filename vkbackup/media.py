@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from vkbackup import firewall, net
-from vkbackup.files import inside, long_path
+from vkbackup.files import inside, is_program_page, long_path
 from vkbackup.store import Store
 
 log = logging.getLogger("vkbackup")
@@ -23,7 +23,7 @@ log = logging.getLogger("vkbackup")
 WORKERS = 4
 MAX_TRIES = 3
 # Ответы, после которых повторять бесполезно: файла нет или ссылка больше не действует
-_GONE = {403, 404, 410}
+GONE = frozenset({403, 404, 410})
 
 
 class DiskProblem(Exception):
@@ -101,6 +101,9 @@ class Downloader:
         if not inside(str(self.root), str(dest)):
             self.store.media_failed(rel_path, "путь вне папки архива", final=True)
             return
+        if is_program_page(rel_path, any_case=True):
+            self.store.media_failed(rel_path, "имя занято страницей архива", final=True)
+            return
         target = Path(long_path(str(dest)))
         if target.exists() and target.stat().st_size > 0:
             self.store.media_done(rel_path, target.stat().st_size)
@@ -113,7 +116,7 @@ class Downloader:
             self.failed_count += 1
             return
         except net.NetError as e:
-            final = e.status in _GONE
+            final = e.status in GONE
             self.store.media_failed(rel_path, str(e), final=final)
             if final:
                 self.failed_count += 1

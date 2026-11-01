@@ -9,10 +9,26 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import os
+import re
 import sys
 from collections.abc import Iterator
 
 IS_WINDOWS = sys.platform.startswith("win")
+
+# Страницы, которые собирает сама программа (vkbackup/render). Только они открываются через пульт
+# как страницы, и скачанный файл на их место лечь не может: присланный человеком .html на этом
+# месте работал бы от имени программы
+_PROGRAM_PAGES = (r"(?:index|stats/index|(?:messages|friends|photos|videos|music|docs)/index"
+                  r"|messages/[^/]+/messages\d*|photos/[^/]+/index|wall/(?:index|page\d+))\.html")
+_PROGRAM_PAGE = re.compile(_PROGRAM_PAGES)
+# Для записи — без учёта регистра: на Windows «INDEX.HTML» — тот же файл, что «index.html»
+_PROGRAM_PAGE_ANY_CASE = re.compile(_PROGRAM_PAGES, re.IGNORECASE)
+
+
+def is_program_page(rel_path: str, *, any_case: bool = False) -> bool:
+    """Путь от корня архива — это страница, которую собирает программа."""
+    pattern = _PROGRAM_PAGE_ANY_CASE if any_case else _PROGRAM_PAGE
+    return pattern.fullmatch(rel_path.replace("\\", "/")) is not None
 
 # Символы, запрещённые в именах на Windows. Слеши тоже: иначе имя стало бы путём
 _FORBIDDEN = '<>:"|?*\\/'

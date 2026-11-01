@@ -7,7 +7,8 @@
 ```bash
 uv sync              # окружение с зависимостями для разработки (pytest, ruff, httpx)
 uv run webui.py      # страница-пульт на http://127.0.0.1:8020
-uv run pytest -q     # тесты
+uv run playwright install chromium  # один раз: браузер для тестов страницы
+uv run pytest -q     # тесты, вместе с браузерными (tests/test_ui_browser.py)
 uv run ruff check .  # линтер
 ```
 
@@ -18,10 +19,13 @@ uv run ruff check .  # линтер
 ```
 webui.py              запуск: сетевой замок — первой строкой, потом приложение FastAPI
 webapp/               сервер страницы-пульта
-  api.py              /api/…: статус, настройки, запуск, «Безопасность»
+  api.py              /api/…: статус, настройки, запуск, поиск, «Безопасность»
+  dashboard.py        «Панель»: файлы по разделам, причины ошибок, диск, история запусков, готовность
   ports.py            выбор порта на 127.0.0.1, защита от чужих сайтов (CSRF, DNS-rebinding)
   config.py, paths.py настройки (settings.json) и пути программы
-webui_assets/         страница-пульт: app.html, static/app.css, static/app.js (без сборки и библиотек)
+webui_assets/         страница-пульт: app.html, static/app.css (без сборки и библиотек)
+  static/js/          скрипты по экранам: core.js первым (запросы, иконки, реестр кнопок onAct),
+                      home, dashboard, setup, search, stats, info — экраны, main.js последним (маршруты, опрос)
 
 vkbackup/
   firewall.py         сетевой замок (аудит-хуки Python): только *.userapi.com, *.vkuserphoto.ru, *.okcdn.ru
@@ -37,6 +41,8 @@ vkbackup/
 tests/
   fake_archive.py     поддельный архив ВК с той же разметкой, что у настоящего
   test_audit.py       тест-сторож: где сетевой код, нет ли eval/subprocess, сколько зависимостей
+  test_ui_browser.py  страница в настоящем браузере (Playwright): каждая кнопка каждого экрана
+  test_frontend.py    скрипты страницы без браузера: синтаксис, обработчик у каждой кнопки
   test_firewall.py    замок в отдельном процессе
 ```
 
