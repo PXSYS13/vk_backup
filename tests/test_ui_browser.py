@@ -7,6 +7,7 @@ conftest.py (settings.json, «Загрузки», папка архива) до�
 
 from __future__ import annotations
 
+import json
 import re
 import socket
 import threading
@@ -609,7 +610,7 @@ def test_help_answers_open_and_close(page: Page):
 # ── Поддержать проект ──
 
 LINKS = {
-    "donate": "https://www.donationalerts.com/r/davronsvv",
+    "donate": "https://dalink.to/davronsvv",
     "telegram": "https://t.me/davronsv",
     "youtube": "https://www.youtube.com/@davronsv",
     "github": "https://github.com/PXSYS13/vk_backup",
@@ -626,6 +627,46 @@ def test_support_screen_links(page: Page, built):
         expect(link).to_have_attribute("href", url)
         expect(link).to_have_attribute("target", "_blank")
         expect(link).to_have_attribute("rel", re.compile(r"\bnoopener\b"))
+
+
+def test_support_screen_lists_supporters(page: Page, monkeypatch, tmp_path):
+    from webapp import paths
+    items = [{"name": f"Человек {i}", "amount": 100 + i, "currency": "RUB", "date": f"2026-10-{10 + i:02d}"}
+             for i in range(11)]
+    items.append({"name": "<img src=x onerror=alert(1)>", "amount": 900, "currency": "RUB",
+                  "date": "2026-10-30", "message": "Спасибо за программу!"})
+    path = tmp_path / "supporters.json"
+    path.write_text(json.dumps({"updated": "2026-10-30", "supporters": items}, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(paths, "SUPPORTERS_FILE", path)
+    _open(page, "support")
+    sup = page.locator("#screen-support")
+    expect(sup.locator("#supporters-count")).to_have_text("Спасибо 12 людям, которые помогли проекту")
+    expect(sup.locator(".top-supporter")).to_have_count(1)  # от 500 ₽ — только один
+    expect(sup.locator(".supporter").first).to_contain_text("<img src=x onerror=alert(1)>")  # имя как текст
+    expect(sup.locator(".supporter img")).to_have_count(0)
+    expect(sup.locator(".supporter blockquote").first).to_have_text("«Спасибо за программу!»")
+    expect(sup.locator(".supporter")).to_have_count(9)
+    sup.locator("[data-act=supporters-more]").click()
+    expect(sup.locator(".supporter")).to_have_count(12)
+    expect(sup.locator("[data-act=supporters-more]")).to_have_count(0)
+
+
+def test_support_screen_with_an_empty_list(page: Page, monkeypatch, tmp_path):
+    from webapp import paths
+    monkeypatch.setattr(paths, "SUPPORTERS_FILE", tmp_path / "missing.json")
+    _open(page, "support")
+    expect(page.locator("#screen-support")).to_contain_text("Здесь появятся имена тех, кто поддержал проект")
+
+
+def test_support_screen_shows_the_donation_qr(page: Page, built):
+    """QR-код от DonationAlerts — чтобы поддержать с телефона; картинка лежит в самой программе."""
+    _open(page, "support")
+    qr = page.locator("#screen-support img.donate-qr")
+    expect(qr).to_be_visible()
+    expect(qr).to_have_attribute("src", "/static/donate-qr.png")
+    expect(qr).to_have_attribute("alt", re.compile("QR"))
+    assert page.evaluate("document.querySelector('#screen-support img.donate-qr').naturalWidth") > 100
+    assert page.request.get("/static/donate-qr.png").headers["content-type"] == "image/png"
 
 
 DAY = 86400

@@ -110,7 +110,7 @@ def test_program_page_loads_nothing_from_internet():
     assert urls == {
         "https://vk.com/data_protection?section=rules&scroll_to_archive=1",
         "https://t.me/davronsv",
-        "https://www.donationalerts.com/r/davronsvv",
+        "https://dalink.to/davronsvv",
         "https://www.youtube.com/@davronsv",
         "https://github.com/PXSYS13/vk_backup",
         "https://github.com/PXSYS13/yadisk_backup",

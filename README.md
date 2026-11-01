@@ -8,7 +8,7 @@
 
 [![Скачать программу](https://img.shields.io/badge/Скачать_программу-бесплатно,_ZIP-2ea44f?style=for-the-badge)](https://github.com/PXSYS13/vk_backup/archive/refs/heads/main.zip)
 [![Безопасность](https://img.shields.io/badge/Безопасность-как_проверить_самому-5b5bd6?style=for-the-badge)](SECURITY.md)
-[![Поддержать](https://img.shields.io/badge/Поддержать-DonationAlerts-ff375f?style=for-the-badge)](https://www.donationalerts.com/r/davronsvv)
+[![Поддержать](https://img.shields.io/badge/Поддержать-DonationAlerts-ff375f?style=for-the-badge)](https://dalink.to/davronsvv)
 [![Telegram](https://img.shields.io/badge/Telegram-@davronsv-2CA5E0?logo=telegram&logoColor=white)](https://t.me/davronsv)
 
 ![Windows · macOS · Linux](https://img.shields.io/badge/Windows_·_macOS_·_Linux-555)
@@ -120,10 +120,17 @@ uv run webui.py
 Программу делает один человек в свободное время, чтобы люди не потеряли свои переписки и фото. Она бесплатная и такой останется. Если она помогла вам — поддержите её развитие любой суммой:
 
 <p align="center">
-  <a href="https://www.donationalerts.com/r/davronsvv"><img src="https://img.shields.io/badge/Поддержать_на_DonationAlerts-карта,_СБП,_кошельки-ff375f?style=for-the-badge" alt="Поддержать на DonationAlerts"></a>
+  <a href="https://dalink.to/davronsvv"><img src="https://img.shields.io/badge/Поддержать_на_DonationAlerts-карта,_СБП,_кошельки-ff375f?style=for-the-badge" alt="Поддержать на DonationAlerts"></a>
+</p>
+
+<p align="center">
+  <a href="https://dalink.to/davronsvv"><img src="webui_assets/static/donate-qr.png" width="180" alt="QR-код: поддержать проект через DonationAlerts"></a><br>
+  <sub>С телефона — наведите камеру на QR-код: откроется <a href="https://dalink.to/davronsvv">dalink.to/davronsvv</a></sub>
 </p>
 
 В сообщении к донату можно написать «VK Backup» — так видно, какая программа пригодилась. Имя и сообщение видны всем; не хотите — подпишитесь «Аноним».
+
+**Нас поддерживают.** Имена тех, кто поддержал программы автора, программа показывает в разделе «Поддержать». Список общий для всех программ автора; новые имена приходят с новой версией программы — за списком она в интернет не ходит.
 
 **Будем на связи:** о сбоях ВК и Яндекса, новых программах и решениях частых проблем автор пишет в [Telegram-канале](https://t.me/davronsv). Помочь можно и без денег: поставьте звезду репозиторию или расскажите о программе тем, кто собирается удалить страницу ВК.
 

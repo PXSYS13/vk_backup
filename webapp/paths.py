@@ -14,5 +14,7 @@ TEMPLATES_DIR = PROJECT / "webui_assets"
 LOG_DIR = PROJECT / "logs"
 WEBUI_LOG = LOG_DIR / "webui.log"
 DEFAULT_BACKUP_DIR = PROJECT / "backup"
+# «Нас поддерживают»: копия общего списка автора (её освежает GitHub Actions, программа — не ходит)
+SUPPORTERS_FILE = PROJECT / "supporters.json"
 # Где искать архив, который прислал ВК: папка «Загрузки»
 DOWNLOADS_DIR = Path.home() / "Downloads"

@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
-from vkbackup import APP_VERSION, firewall, media, stats
+from vkbackup import APP_VERSION, firewall, media, stats, supporters
 from vkbackup.archive import Archive, NotAnArchive
 from vkbackup.backup import SECTION_TITLES, SECTIONS, Backup, render_archive
 from vkbackup.files import is_program_page, long_path
@@ -253,6 +253,17 @@ def chats() -> dict:
         return {"chats": stats.chats(store)}
     finally:
         store.close()
+
+
+@router.get("/api/supporters")
+def get_supporters() -> dict:
+    """«Нас поддерживают»: копия общего списка автора, пришедшая вместе с программой.
+
+    За свежим списком программа никуда не ходит — он приходит с новой версией."""
+    data = supporters.load_local(paths.SUPPORTERS_FILE) or {"updated": None, "supporters": []}
+    top_min = data.get("top_min_rub", supporters.TOP_MIN_RUB)
+    return {**data, "people": supporters.count_people(data["supporters"]),
+            "top": supporters.top_supporters(data["supporters"], top_min), "top_min_rub": top_min}
 
 
 @router.get("/api/dashboard")

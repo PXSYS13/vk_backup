@@ -443,6 +443,20 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border-radius:6px;bor
 .promos .app-promo{margin-top:0}
 .promo-actions{flex-wrap:nowrap}
 .support-card .sec-ico{width:44px;height:44px}
+/* «Нас поддерживают» */
+.supporters{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.supporter{padding:12px 14px;border-radius:var(--radius-sm);background:var(--surface-2);min-width:0}
+.supporter-top,.top-supporter{display:flex;gap:10px;align-items:center;min-width:0}
+.supporter-top .grow,.top-supporter .grow{flex:1}
+.supporter-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.supporter-sum{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--accent-text)}
+.supporter blockquote{margin-top:8px;font-size:14px;color:var(--text-2);overflow-wrap:anywhere}
+.top-supporters{list-style:none;display:flex;flex-direction:column;gap:8px}
+.top-supporter{padding:10px 12px;border-radius:var(--radius-sm);background:var(--accent-soft)}
+.top-rank{width:24px;text-align:center;font-weight:700;color:var(--accent-text);flex:none}
+/* QR-код — на белом в любой теме: тёмный фон камера телефона не прочитает */
+.donate-row{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.donate-qr{display:block;width:132px;height:132px;padding:6px;border-radius:12px;background:#fff;border:1px solid var(--border);image-rendering:pixelated}
 @media (max-width:520px){
   .app-promo{grid-template-columns:40px minmax(0,1fr)}
   .promo-actions{grid-column:1 / -1;flex-wrap:wrap}

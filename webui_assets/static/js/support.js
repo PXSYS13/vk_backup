@@ -6,7 +6,7 @@
 
 const LINKS = {
   telegram: 'https://t.me/davronsv',
-  donate: 'https://www.donationalerts.com/r/davronsvv',
+  donate: 'https://dalink.to/davronsvv',
   youtube: 'https://www.youtube.com/@davronsv',
   github: 'https://github.com/PXSYS13/vk_backup',
   issues: 'https://github.com/PXSYS13/vk_backup/issues/new',
@@ -148,6 +148,64 @@ function askCard() {
     <div class="row mt-14">${link('telegram', 'В канал', 'btn', 'send')}${link('issues', 'Спросить', 'btn', 'external')}</div></div>`;
 }
 
+// ── «Нас поддерживают»: копия общего списка автора, пришедшая с программой ──
+const BACKERS_PAGE = 9;
+const backers = {data: null, busy: false, shown: BACKERS_PAGE};
+const CURRENCY_SIGN = {RUB: '₽', USD: '$', EUR: '€'};
+const money = (amount, currency) => `${num(amount)} ${CURRENCY_SIGN[currency] || currency}`;
+// «2026-10-30» → «30 октября 2026»: дата без времени, сдвигать её по часовому поясу нельзя
+function isoDay(s) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  return y && m && d ? `${d} ${MONTHS[m - 1]} ${y}` : '';
+}
+
+async function loadBackers() {
+  if (backers.busy || backers.data) return;
+  backers.busy = true;
+  try {
+    backers.data = await api('/api/supporters');
+  } catch (e) {
+    backers.data = {supporters: [], top: [], people: 0};
+  } finally {
+    backers.busy = false;
+  }
+  if (routeName() === 'support') redrawAsks();
+}
+
+function backerCard(x, i) {
+  return `<li class="supporter"><div class="supporter-top">${avatar(x.name, i)}
+    <div class="min0 grow"><div class="supporter-name">${esc(x.name)}</div><div class="tiny">${esc(isoDay(x.date))}</div></div>
+    ${x.amount != null ? `<div class="supporter-sum">${esc(money(x.amount, x.currency))}</div>` : ''}</div>
+    ${x.message ? `<blockquote>«${esc(x.message)}»</blockquote>` : ''}</li>`;
+}
+
+function topBackerCard(p, i) {
+  const since = p.donations > 1 ? `${plural(p.donations, 'донат', 'доната', 'донатов')}, первый — ${isoDay(p.since)}` : isoDay(p.since);
+  return `<li class="top-supporter"><span class="top-rank">${i + 1}</span>${avatar(p.name, i)}
+    <div class="min0 grow"><div class="supporter-name">${esc(p.name)}</div><div class="tiny">${esc(since)}</div></div>
+    <div class="supporter-sum">${p.sums.map((s) => esc(money(s.amount, s.currency))).join(' + ')}</div></li>`;
+}
+
+function backersSection() {
+  const d = backers.data;
+  if (!d) {
+    loadBackers();
+    return '<div class="card" id="supporters"><h2>Нас поддерживают</h2><p class="muted mt-8">Загружаю…</p></div>';
+  }
+  const list = d.supporters || [], top = d.top || [];
+  const people = d.people ? `Спасибо ${num(d.people)} ${word(d.people, 'человеку', 'людям', 'людям')}, которые помогли проекту` : '';
+  const topBlock = top.length ? `<h3 class="mt-14">Больше всех помогли</h3>
+    <p class="tiny">Все донаты одного человека складываются. Здесь те, кто поддержал на ${esc(money(d.top_min_rub || 500, 'RUB'))} и больше.</p>
+    <ol class="top-supporters mt-8">${top.map(topBackerCard).join('')}</ol>` : '';
+  const listBlock = list.length ? `<ul class="supporters mt-14">${list.slice(0, backers.shown).map(backerCard).join('')}</ul>
+    ${backers.shown < list.length ? '<div class="row mt-12 center-row"><button type="button" class="btn" data-act="supporters-more">Показать ещё</button></div>' : ''}`
+    : `<div class="empty">${icon('heart')}Здесь появятся имена тех, кто поддержал проект</div>`;
+  return `<div class="card" id="supporters"><h2>Нас поддерживают</h2>
+    <p class="muted" id="supporters-count">${esc(people)}</p>${topBlock}${listBlock}
+    <p class="tiny mt-12">Список общий для всех программ автора${d.updated ? `, обновлён ${esc(isoDay(d.updated))}` : ''}.
+      Новые имена приходят с новой версией программы: сама она за списком в интернет не ходит.</p></div>`;
+}
+
 function renderSupport() {
   const f = flagState();
   const promos = ['yadisk', 'icloud'].map((k) => promoCard(k)).join('');
@@ -162,8 +220,12 @@ function renderSupport() {
       <div class="card support-card"><span class="sec-ico">${icon('heart')}</span><h2 class="mt-12">Поддержать автора</h2>
         <p class="muted">Любая сумма, по желанию: на неё живут эта программа и соседние. В сообщении можно написать название
           программы — мне важно знать, что пригодилось. Имя и сообщение видны всем; не хотите — подпишитесь «Аноним».</p>
-        <div class="row mt-14">${link('donate', 'Поддержать', 'btn primary', 'heart')}</div></div></div>
+        <div class="donate-row mt-14"><div>${link('donate', 'Поддержать', 'btn primary', 'heart')}
+          <p class="tiny mt-8">Или наведите камеру телефона на QR-код — откроется та же страница DonationAlerts.</p></div>
+          <img class="donate-qr" src="/static/donate-qr.png" width="132" height="132"
+            alt="QR-код: поддержать проект через DonationAlerts (dalink.to/davronsvv)"></div></div></div>
     <div class="row">${link('youtube', 'YouTube', 'btn', 'play')}${link('github', 'Код на GitHub', 'btn', 'code')}</div>
+    ${backersSection()}
     ${promos ? `<div><h2>Другие программы автора</h2><div class="promos mt-12">${promos}</div></div>` : ''}
     <div class="card"><h2>Без слежки</h2>
       <p class="muted">Программа никуда не сообщает, нажали ли вы на ссылку: ссылки открываются в вашем браузере, а сама она
@@ -186,6 +248,10 @@ onAct('flag-later', (btn) => {
 });
 onAct('flag-hide', () => {
   saveFlag({hidden: !flagState().hidden});
+  redrawAsks();
+});
+onAct('supporters-more', () => {
+  backers.shown += BACKERS_PAGE;
   redrawAsks();
 });
 onAct('promo-own', (btn) => {

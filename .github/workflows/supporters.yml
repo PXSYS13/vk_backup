@@ -1,0 +1,54 @@
+# «Нас поддерживают»: раз в час берёт общий список автора из репозитория «Бэкапа Яндекс.Диска»
+# (его туда переносит tools/sync_supporters.py) и сохраняет копию рядом с программой.
+# Ключей не нужно: файл публичный. Сама программа за списком никуда не ходит — сетевой замок
+# пускает её только к файловым серверам ВК, а новые имена приходят с новой версией.
+# Коммит от GITHUB_TOKEN не запускает CI.
+name: supporters
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: supporters
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'PXSYS13/vk_backup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Взять список из «Бэкапа Яндекс.Диска»
+        run: |
+          curl -fsSL --max-time 30 -o supporters.json.new \
+            https://raw.githubusercontent.com/PXSYS13/yadisk_backup/main/supporters.json
+          # Только настоящий список и не больше 256 КБ: битый ответ не заменит рабочую копию
+          python3 - <<'EOF'
+          import json, os, sys
+          path = "supporters.json.new"
+          if os.path.getsize(path) > 256 * 1024:
+              sys.exit("список больше 256 КБ — не беру")
+          data = json.load(open(path, encoding="utf-8"))
+          if not isinstance(data, dict) or not isinstance(data.get("supporters"), list):
+              sys.exit("в файле нет списка supporters — не беру")
+          EOF
+          mv supporters.json.new supporters.json
+
+      - name: Сохранить, если изменился
+        run: |
+          if git diff --quiet -- supporters.json; then
+            echo "Список не изменился"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898341+github-actions[bot]@users.noreply.github.com"
+          git add supporters.json
+          git commit -m "chore: update supporters list"
+          git push
