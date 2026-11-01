@@ -104,9 +104,19 @@ def test_program_page_loads_nothing_from_internet():
                    for f in sorted((ROOT / "webui_assets" / "static" / "js").rglob("*.js")))
     assert js, "скрипты страницы не нашлись"
     assert all(not a.startswith(("'http", '"http', "`http")) for a in re.findall(r"fetch\(\s*([^,)]+)", js))
-    # Единственный внешний адрес — ссылка на страницу ВК «Защита данных», которую человек открывает сам
+    # Внешние адреса — только ссылки, которые человек открывает сам: страница ВК «Защита данных»,
+    # канал и поддержка автора, соседние программы. Программа по ним ничего не запрашивает
     urls = set(re.findall(r"https?://[^\s'\"`)<]+", js))
-    assert urls == {"https://vk.com/data_protection?section=rules&scroll_to_archive=1"}
+    assert urls == {
+        "https://vk.com/data_protection?section=rules&scroll_to_archive=1",
+        "https://t.me/davronsv",
+        "https://www.donationalerts.com/r/davronsvv",
+        "https://www.youtube.com/@davronsv",
+        "https://github.com/PXSYS13/vk_backup",
+        "https://github.com/PXSYS13/yadisk_backup",
+        "https://github.com/PXSYS13/icloud_backup",
+        "https://github.com/PXSYS13/vk_backup/issues/new",
+    }
     css = (ROOT / "webui_assets" / "static" / "app.css").read_text(encoding="utf-8")
     assert "http" not in css and "@import" not in css
 

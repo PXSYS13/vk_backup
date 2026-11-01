@@ -1,7 +1,7 @@
 // Каркас: маршруты, перерисовка по опросу статуса, тема, подсказки, клавиши. Этот файл — последним.
 'use strict';
 
-const ROUTES = ['home', 'dashboard', 'search', 'stats', 'setup', 'security', 'help'];
+const ROUTES = ['home', 'dashboard', 'search', 'stats', 'setup', 'security', 'help', 'support'];
 const POLL_EVERY = 1500;
 
 const routeName = () => {
@@ -21,6 +21,7 @@ const SCREENS = {
   stats: renderStats,
   security: renderSecurity,
   help: () => { if (!$('#screen-help').innerHTML) renderHelp(); },
+  support: renderSupport,
 };
 
 function route() {
@@ -33,6 +34,7 @@ function route() {
   }
   if (name === 'security') api('/api/security').then((d) => { security = d; render.sig = null; render(); }).catch(() => {});
   if (name === 'dashboard') loadDashboard(true);
+  if (name === 'home') flagVisitPending = true;
   if (name !== 'search') $('#screen-search').innerHTML = '';
   if (name !== 'setup') setupUi.error = '';
   render.sig = null;

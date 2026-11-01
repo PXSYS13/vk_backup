@@ -172,7 +172,7 @@ function renderHome() {
   }
   const what = s.sections.filter((x) => s.settings.sections.includes(x.key)).map((x) => x.title).join(', ');
   const hero = `<div class="card hero"><div class="hero-top"><span class="pill ${h.pill[0]}"><span class="pdot"></span>${esc(h.pill[1])}</span>
-      <span class="heartbeat">${beat}</span></div>
+      <span class="hero-top-end"><span class="heartbeat">${beat}</span>${flagPennant()}</span></div>
     <div class="hero-body">${visual}<div><h1>${esc(h.title)}</h1><p class="sub">${h.sub}</p><div class="row actions">${h.actions}</div></div></div>
     ${stats}
     <div class="hero-what">Что сохраняем: ${esc(what || 'ничего')}${s.settings.download ? ' — с фото и голосовыми' : ' — только текст, без сети'} · <a href="#/setup">изменить</a>${isBusy(job) ? '' : lastRunLine(r)}</div></div>`;
@@ -197,7 +197,7 @@ function renderHome() {
   const safety = r && r.index ? `<div class="banner info"><span class="b-icon">${icon('copy')}</span><div><h3>Прежде чем удалять страницу ВК</h3>
     <p>Откройте архив и пролистайте важные переписки. Скопируйте папку <code>${esc(s.settings.folder)}</code> на второй диск или флешку —
     одна копия на одном диске ненадёжна. Что ещё проверить — на <a href="#/dashboard">панели</a>.</p></div></div>` : '';
-  $('#screen-home').innerHTML = `<div class="stack">${hero}${problem}${banner}${r && r.index ? onThisDay() : ''}${r ? sectionCards(s) : ''}${failed}${safety}</div>`;
+  $('#screen-home').innerHTML = `<div class="stack">${hero}${flagCard()}${problem}${banner}${r && r.index ? onThisDay() : ''}${r ? sectionCards(s) : ''}${failed}${safety}</div>`;
 }
 
 onAct('start', async () => {

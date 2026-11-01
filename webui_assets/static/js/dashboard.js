@@ -207,7 +207,7 @@ function renderDashboard() {
     return;
   }
   el.innerHTML = `<div class="stack">${head}${kpis(dash)}
-    <div class="dash-2">${readinessCard(dash)}${nowCard(state)}</div>
+    <div class="dash-2">${readinessCard(dash)}${nowCard(state)}</div>${fiveCard(dash)}
     ${filesCard(dash)}${reasonsCard(dash)}
     <div class="dash-2">${archiveCard(dash)}${folderCard(dash)}</div>
     <div class="dash-2">${runsCard(dash)}${networkCard(dash)}</div></div>`;

@@ -27,7 +27,7 @@ from vkbackup.store import DB_NAME, Store  # noqa: E402
 from webapp import api, config, ports  # noqa: E402
 
 ALL = ["messages", "friends", "photos", "videos", "wall", "music", "docs"]
-ROUTES = ["home", "dashboard", "search", "stats", "setup", "security", "help"]
+ROUTES = ["home", "dashboard", "search", "stats", "setup", "security", "help", "support"]
 
 
 def _browser_installed() -> bool:
@@ -303,6 +303,7 @@ def test_section_cards_open_archive_pages(page: Page, built):
     assert len(hrefs) >= 5
     for href in hrefs:
         assert page.request.get(href).status == 200, href
+    expect(page.locator("#screen-home a.sec.promo")).to_have_css("display", "flex")
     page.locator("#screen-home a.sec.promo").click()
     expect(page.locator("#screen-stats")).to_be_visible()
 
@@ -603,6 +604,222 @@ def test_help_answers_open_and_close(page: Page):
         expect(item).to_have_attribute("open", "")
         item.locator("summary").click()
         expect(item).not_to_have_attribute("open", "")
+
+
+# ── Поддержать проект ──
+
+LINKS = {
+    "donate": "https://www.donationalerts.com/r/davronsvv",
+    "telegram": "https://t.me/davronsv",
+    "youtube": "https://www.youtube.com/@davronsv",
+    "github": "https://github.com/PXSYS13/vk_backup",
+    "yadisk": "https://github.com/PXSYS13/yadisk_backup",
+    "icloud": "https://github.com/PXSYS13/icloud_backup",
+}
+
+
+def test_support_screen_links(page: Page, built):
+    _open(page, "support")
+    for key, url in LINKS.items():
+        link = page.locator(f"#screen-support a[data-link={key}]").first
+        expect(link).to_be_visible()
+        expect(link).to_have_attribute("href", url)
+        expect(link).to_have_attribute("target", "_blank")
+        expect(link).to_have_attribute("rel", re.compile(r"\bnoopener\b"))
+
+
+DAY = 86400
+
+
+def _flag_card(page: Page):
+    return page.locator("#screen-home .flag-card")
+
+
+def test_flag_opens_after_first_backup_and_calms_down(page: Page, built):
+    _open(page)
+    card = _flag_card(page)
+    expect(card).to_be_visible()
+    expect(card.locator("h2")).to_have_text("Будем на связи")
+    expect(card.locator("a[data-link=telegram]")).to_have_text(re.compile("Подписаться"))
+    expect(card.locator("a[data-link=donate]")).to_have_text(re.compile("Поддержать"))
+    expect(card.locator("[data-promo=yadisk]")).to_be_visible()
+    pennant = page.locator("#screen-home [data-act=flag-toggle]")
+    expect(pennant).to_have_text(re.compile("От автора"))
+    expect(pennant).to_have_attribute("aria-expanded", "true")
+    # «Не сейчас» — карточка сворачивается, флажок остаётся; и так же после перезагрузки
+    card.locator("[data-act=flag-later]").click()
+    expect(card).to_have_count(0)
+    expect(pennant).to_have_attribute("aria-expanded", "false")
+    page.reload()
+    expect(page.locator("#screen-home h1")).to_be_visible()
+    expect(_flag_card(page)).to_have_count(0)
+    # Флажок раскрывает карточку по щелчку
+    page.locator("#screen-home [data-act=flag-toggle]").click()
+    expect(_flag_card(page)).to_be_visible()
+
+
+def test_flag_calms_after_a_link_click(page: Page, built):
+    _open(page)
+    with page.context.expect_page() as tab:
+        _flag_card(page).locator("a[data-link=telegram]").click()
+    assert tab.value.url.startswith("https://t.me/davronsv") or tab.value.url == "about:blank"
+    tab.value.close()
+    expect(_flag_card(page)).to_have_count(0)
+    stored = page.evaluate("JSON.parse(localStorage.getItem('vkb.flag'))")
+    assert stored["clickedAt"] > 0
+    assert "telegram" not in str(stored)  # какую ссылку нажали — не записываем
+
+
+def test_flag_calms_after_three_visits_without_a_click(page: Page, built):
+    _open(page)
+    for _ in range(2):
+        expect(_flag_card(page)).to_be_visible()
+        page.locator(".nav a[data-route=help]").click()
+        page.locator(".nav a[data-route=home]").click()
+    expect(_flag_card(page)).to_be_visible()  # третий визит
+    page.locator(".nav a[data-route=help]").click()
+    page.locator(".nav a[data-route=home]").click()
+    expect(page.locator("#screen-home h1")).to_be_visible()
+    expect(_flag_card(page)).to_have_count(0)
+    expect(page.locator("#screen-home [data-act=flag-toggle]")).to_be_visible()
+
+
+def test_flag_returns_after_a_month_with_a_new_backup(page: Page, built):
+    _open(page)
+    expect(_flag_card(page)).to_be_visible()
+    stale = int((time.time() - 40 * DAY) * 1000)
+    page.evaluate(f"""localStorage.setItem('vkb.flag', JSON.stringify(
+        {{lastFullAt: {stale}, lastBackupId: 1, visits: 9, dismissed: {{home: 1}}}}))""")
+    page.reload()
+    expect(_flag_card(page)).to_be_visible()
+    # Тот же бэкап через неделю — уже не показываем снова
+    recent = int((time.time() - 7 * DAY) * 1000)
+    page.evaluate(f"""localStorage.setItem('vkb.flag', JSON.stringify(
+        {{lastFullAt: {recent}, lastBackupId: 1, visits: 9}}))""")
+    page.reload()
+    expect(page.locator("#screen-home h1")).to_be_visible()
+    expect(_flag_card(page)).to_have_count(0)
+
+
+def test_no_flag_while_backup_runs_or_fails(page: Page, built):
+    real = page.request.get("/api/status").json()
+
+    def status_with(job):  # обработчику Playwright передаёт и запрос вторым аргументом — job в замыкании
+        return lambda route: route.fulfill(json={**real, "job": {**real["job"], **job}})
+
+    for job in ({"state": "running", "step": "download"}, {"state": "error", "problem": "disk", "problem_text": "Нет места"}):
+        page.route("**/api/status", status_with(job))
+        _open(page)
+        expect(page.locator("#screen-home .pill")).to_be_visible()
+        expect(page.locator("#screen-home [data-act=flag-toggle]")).to_have_count(0)
+        expect(_flag_card(page)).to_have_count(0)
+        page.locator(".nav a[data-route=stats]").click()
+        expect(page.locator("#screen-stats .tile").first).to_be_visible()
+        expect(page.locator("#screen-stats .thanks-card")).to_have_count(0)
+        page.unroute("**/api/status")
+
+
+def test_hide_flag_switch_and_own_programs(page: Page, built):
+    _open(page, "support")
+    sup = page.locator("#screen-support")
+    expect(sup).to_contain_text("Программа никуда не сообщает, нажали ли вы на ссылку")
+    sup.locator("[data-act=promo-own][data-app=yadisk]").click()
+    expect(sup.locator("[data-promo=yadisk]")).to_have_count(0)
+    expect(sup.locator("[data-promo=icloud]")).to_be_visible()
+    hide = sup.locator("[data-act=flag-hide]")
+    expect(hide).to_have_attribute("aria-pressed", "false")
+    hide.click()
+    expect(hide).to_have_attribute("aria-pressed", "true")
+    page.locator(".nav a[data-route=home]").click()
+    expect(page.locator("#screen-home h1")).to_be_visible()
+    expect(page.locator("#screen-home [data-act=flag-toggle]")).to_have_count(0)
+    expect(_flag_card(page)).to_have_count(0)
+    expect(page.locator(".nav a[data-route=support]")).to_be_visible()  # пункт меню остаётся всегда
+
+
+def test_clicks_outside_the_flag_cards_do_not_touch_the_flag(page: Page, built):
+    _open(page, "help")
+    with page.context.expect_page() as tab:
+        page.locator("#screen-help .ask-card a[data-link=telegram]").click()
+    tab.value.close()
+    assert page.evaluate("JSON.parse(localStorage.getItem('vkb.flag') || '{}').clickedAt") is None
+    page.locator(".nav a[data-route=home]").click()
+    expect(_flag_card(page)).to_be_visible()
+
+
+def test_flag_works_when_the_browser_blocks_storage(page: Page, built):
+    page.add_init_script("""Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }});""")
+    _open(page)
+    card = _flag_card(page)
+    expect(card).to_be_visible()
+    card.locator("[data-act=flag-later]").click()
+    expect(_flag_card(page)).to_have_count(0)
+
+
+def test_full_score_card_follows_the_flag_pause(page: Page, built):
+    """Новый бэкап — новый номер, но карточка «5 из 5» не возвращается раньше флажка."""
+    def all_ok(route):
+        data = route.fetch().json()
+        data["checks"] = [{**c, "ok": True} for c in data["checks"]]
+        route.fulfill(json=data)
+
+    page.route("**/api/dashboard", all_ok)
+    recent = int((time.time() - 3 * DAY) * 1000)
+    page.add_init_script(f"""localStorage.setItem('vkb.flag', JSON.stringify(
+        {{lastFullAt: {recent}, lastBackupId: 1, visits: 9, clickedAt: {recent}}}))""")
+    _open(page, "dashboard")
+    expect(page.locator("#screen-dashboard .kpi").first).to_be_visible()
+    expect(page.locator("#screen-dashboard .five-card")).to_have_count(0)
+
+
+def test_dashboard_full_score_card(page: Page, built):
+    def all_ok(route):
+        data = route.fetch().json()
+        data["checks"] = [{**c, "ok": True} for c in data["checks"]]
+        route.fulfill(json=data)
+
+    page.route("**/api/dashboard", all_ok)
+    _open(page, "dashboard")
+    card = page.locator("#screen-dashboard .five-card")
+    expect(card).to_be_visible()
+    expect(card.locator("h2")).to_have_text("5 из 5: копия полная")
+    expect(card.locator("a[data-link=telegram]")).to_be_visible()
+    expect(card.locator("[data-promo=icloud]")).to_be_visible()
+    card.locator("[data-act=flag-later]").click()
+    expect(page.locator("#screen-dashboard .five-card")).to_have_count(0)
+
+
+def test_stats_thanks_card_and_copy_summary(page: Page, built, base_url):
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=base_url)
+    _open(page, "stats")
+    card = page.locator("#screen-stats .thanks-card")
+    expect(card.locator("h2")).to_have_text("8 сообщений за 3 года — теперь у вас")
+    expect(card.locator("a[data-link=donate]")).to_be_visible()
+    card.locator("[data-act=copy]").click()
+    expect(_toast(page)).to_contain_text("Скопировано")
+    text = page.evaluate("navigator.clipboard.readText()")
+    assert "8 сообщений за 3 года" in text and "github.com/PXSYS13/vk_backup" in text
+
+
+def test_help_points_to_channel_and_questions(page: Page):
+    _open(page, "help")
+    card = page.locator("#screen-help .ask-card")
+    expect(card.locator("h2")).to_have_text("Не нашли ответ?")
+    expect(card.locator("a[data-link=telegram]")).to_have_text(re.compile("В канал"))
+    expect(card.locator("a[data-link=issues]")).to_have_attribute(
+        "href", "https://github.com/PXSYS13/vk_backup/issues/new")
+    expect(card.locator("a[data-link=donate]")).to_have_count(0)  # человек застрял — денег не просим
+
+
+def test_page_requests_nothing_outside_the_program(page: Page, built, base_url):
+    """Ссылки на канал, донат и соседние программы человек открывает сам — страница по ним
+    ничего не запрашивает: ни картинок, ни счётчиков, ни аналитики."""
+    outside: list[str] = []
+    page.on("request", lambda r: outside.append(r.url) if not r.url.startswith(base_url) else None)
+    for route in ROUTES:
+        _open(page, route)
+        _settled(page, route)
+    assert outside == []
 
 
 # ── Сквозные проверки ──

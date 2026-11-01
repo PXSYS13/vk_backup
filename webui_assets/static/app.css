@@ -425,6 +425,29 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border-radius:6px;bor
   .facts-list dd{margin-bottom:6px}
 }
 
+/* ── Поддержать: флажок «От автора», карточки, соседние программы ── */
+.nav a.nav-support{color:var(--accent-text);margin-top:6px}
+.nav a.nav-support .ico{color:var(--accent-text)}
+.hero-top-end{display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pennant{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px 0 10px;border:0;border-radius:8px 8px 8px 2px;
+  background:var(--grad);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--glow)}
+.pennant .i{width:15px;height:15px}
+.pennant[aria-expanded=true]{box-shadow:0 0 0 3px var(--accent-soft)}
+.pennant.glow{animation:pennant-glow 1.2s ease-in-out 2}
+@keyframes pennant-glow{50%{box-shadow:0 0 0 8px var(--accent-soft),var(--glow)}}
+.ask .sec-ico.ok{background:var(--ok-soft);color:var(--ok)}
+.flag-card{border-color:var(--accent-line)}
+.promos{display:flex;flex-direction:column;gap:10px}
+.app-promo{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:14px;padding:12px 14px;
+  border-radius:var(--radius-sm);background:var(--surface-2)}
+.promos .app-promo{margin-top:0}
+.promo-actions{flex-wrap:nowrap}
+.support-card .sec-ico{width:44px;height:44px}
+@media (max-width:520px){
+  .app-promo{grid-template-columns:40px minmax(0,1fr)}
+  .promo-actions{grid-column:1 / -1;flex-wrap:wrap}
+}
+
 /* Отступы классами: атрибут style запрещён политикой безопасности страницы */
 .mt-8{margin-top:8px}.mt-10{margin-top:10px}.mt-12{margin-top:12px}.mt-14{margin-top:14px}.mb-10{margin-bottom:10px}
 .min0{min-width:0}

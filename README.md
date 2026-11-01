@@ -8,6 +8,8 @@
 
 [![Скачать программу](https://img.shields.io/badge/Скачать_программу-бесплатно,_ZIP-2ea44f?style=for-the-badge)](https://github.com/PXSYS13/vk_backup/archive/refs/heads/main.zip)
 [![Безопасность](https://img.shields.io/badge/Безопасность-как_проверить_самому-5b5bd6?style=for-the-badge)](SECURITY.md)
+[![Поддержать](https://img.shields.io/badge/Поддержать-DonationAlerts-ff375f?style=for-the-badge)](https://www.donationalerts.com/r/davronsvv)
+[![Telegram](https://img.shields.io/badge/Telegram-@davronsv-2CA5E0?logo=telegram&logoColor=white)](https://t.me/davronsv)
 
 ![Windows · macOS · Linux](https://img.shields.io/badge/Windows_·_macOS_·_Linux-555)
 ![MIT](https://img.shields.io/badge/лицензия-MIT-green)
@@ -112,6 +114,25 @@ uv run webui.py
 
 Тесты и проверки кода — `uv run pytest -q` и `uv run ruff check .`.
 </details>
+
+## Поддержать проект
+
+Программу делает один человек в свободное время, чтобы люди не потеряли свои переписки и фото. Она бесплатная и такой останется. Если она помогла вам — поддержите её развитие любой суммой:
+
+<p align="center">
+  <a href="https://www.donationalerts.com/r/davronsvv"><img src="https://img.shields.io/badge/Поддержать_на_DonationAlerts-карта,_СБП,_кошельки-ff375f?style=for-the-badge" alt="Поддержать на DonationAlerts"></a>
+</p>
+
+В сообщении к донату можно написать «VK Backup» — так видно, какая программа пригодилась. Имя и сообщение видны всем; не хотите — подпишитесь «Аноним».
+
+**Будем на связи:** о сбоях ВК и Яндекса, новых программах и решениях частых проблем автор пишет в [Telegram-канале](https://t.me/davronsv). Помочь можно и без денег: поставьте звезду репозиторию или расскажите о программе тем, кто собирается удалить страницу ВК.
+
+В самой программе всё это — в разделе «Поддержать» и на флажке «От автора» на главной после удачного бэкапа. Флажок не всплывает поверх экрана, его можно скрыть, а программа никуда не сообщает, нажали ли вы на ссылку.
+
+### Другие программы автора
+
+- [**Яндекс Бэкап**](https://github.com/PXSYS13/yadisk_backup) — сохраняет весь Яндекс.Диск на компьютер и работает, даже когда Яндекс недоступен.
+- [**iCloud Бэкап**](https://github.com/PXSYS13/icloud_backup) — скачивает всю медиатеку iCloud Фото на компьютер, если вы больше не платите за iCloud+.
 
 ## Лицензия
 

@@ -80,7 +80,7 @@ function renderStats() {
       ${r.stats_page ? `<a class="btn" href="/archive/stats/index.html" target="_blank" rel="noopener">${icon('external')}Страница в архиве</a>` : ''}</div>
     ${tiles}${yearsCard}<div class="grid-2">${peopleCard}<div class="stack">${hoursCard}${wdCard}</div></div>
     <div class="facts">${firstCard}${busyCard}</div>${kindsCard}${groups}
-    <div class="grid-2">${yearBars(s.friends_by_year, 'Новые друзья по годам')}${yearBars(s.photos_by_year, 'Фото в альбомах по годам')}</div></div>`;
+    <div class="grid-2">${yearBars(s.friends_by_year, 'Новые друзья по годам')}${yearBars(s.photos_by_year, 'Фото в альбомах по годам')}</div>${thanksCard(s, years)}</div>`;
 }
 
 async function loadInsights() {

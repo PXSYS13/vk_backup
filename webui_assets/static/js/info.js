@@ -59,5 +59,5 @@ function renderHelp() {
     ['Как проверить, что программа ничего не отправляет?', 'Раздел «Безопасность»: там список всех серверов, с которыми программа говорила, и пошаговая проверка средствами самой Windows.'],
   ];
   $('#screen-help').innerHTML = `<div class="stack"><div><h1>Помощь</h1></div><div class="card">
-    ${faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><div>${esc(a)}</div></details>`).join('')}</div></div>`;
+    ${faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><div>${esc(a)}</div></details>`).join('')}</div>${askCard()}</div>`;
 }
